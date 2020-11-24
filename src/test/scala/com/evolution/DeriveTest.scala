@@ -26,8 +26,8 @@ class DeriveTest extends AnyFunSuite with Matchers {
 
   test("derive unit") {
     val expected = ()
-    val actual: () = derive((), ())()
-    actual shouldEqual expected
+    def actual(): Unit = derive((), ())()
+    actual() shouldEqual expected
   }
 
   test("derive product") {
