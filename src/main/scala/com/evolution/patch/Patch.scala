@@ -10,10 +10,10 @@ import cats.{Applicative, Monad, Monoid}
   *
   * @tparam S state
   * @tparam E event
-  * @tparam M cumulative effect
+  * @tparam F cumulative effect
   * @tparam A abstract return type
   */
-sealed abstract class Patch[+F[_], +S, +E, M, A]
+sealed abstract class Patch[+M[_], +S, +E, F, A]
 
 object Patch {
 
@@ -21,7 +21,7 @@ object Patch {
 
   private[Patch] class Apply[S](val b: Boolean = false) extends AnyVal {
 
-    def apply[F[_], E, M, A](f: (S, SeqNr) => F[(Option[(S, E)], M, A)]): Patch[F, S, E, M, A] = Default(f)
+    def apply[M[_], E, F, A](f: (S, SeqNr) => M[(Option[(S, E)], F, A)]): Patch[M, S, E, F, A] = Default(f)
   }
 
 
@@ -29,7 +29,7 @@ object Patch {
 
   private[Patch] class ChangeApply[S](val b: Boolean = false) extends AnyVal {
 
-    def apply[F[_], E, M, A](f: (S, SeqNr) => F[(S, E, M, A)]): Patch[F, S, E, M, A] = Change(f)
+    def apply[M[_], E, F, A](f: (S, SeqNr) => M[(S, E, F, A)]): Patch[M, S, E, F, A] = Change(f)
   }
 
 
@@ -43,30 +43,30 @@ object Patch {
 
   def pure[A](value: A): Patch[Nothing, Nothing, Nothing, Unit, A] = Pure(value)
 
-  def lift[F[_], A](value: F[A]): Patch[F, Nothing, Nothing, Unit, A] = Lift(value)
+  def lift[M[_], A](value: M[A]): Patch[M, Nothing, Nothing, Unit, A] = Lift(value)
 
-  def effect[M](value: M): Patch[Nothing, Nothing, Nothing, M, Unit] = Effect(value)
+  def effect[F](value: F): Patch[Nothing, Nothing, Nothing, F, Unit] = Effect(value)
 
-  def when[F[_], S, E, M: Empty, A: Empty](
+  def when[M[_], S, E, F: Empty, A: Empty](
     cond: Boolean)(
-    patch: => Patch[F, S, E, M, A]
-  ): Patch[F, S, E, M, A] = {
-    if (cond) patch else pure(Empty[A].empty).effect(Empty[M].empty)
+    patch: => Patch[M, S, E, F, A]
+  ): Patch[M, S, E, F, A] = {
+    if (cond) patch else pure(Empty[A].empty).effect(Empty[F].empty)
   }
 
 
-  implicit def monoidPatch[F[_]: Applicative, S, E, A: Empty, M: Empty](implicit
-    derive: Derive[M, M, M]
-  ): Monoid[Patch[F, S, E, M, A]] = {
-    new Monoid[Patch[F, S, E, M, A]] {
+  implicit def monoidPatch[M[_]: Applicative, S, E, F: Empty, A: Empty](implicit
+    derive: Derive[F, F, F]
+  ): Monoid[Patch[M, S, E, F, A]] = {
+    new Monoid[Patch[M, S, E, F, A]] {
 
       def empty = {
         Patch
           .pure(Empty[A].empty)
-          .effect(Empty[M].empty)
+          .effect(Empty[F].empty)
       }
 
-      def combine(x: Patch[F, S, E, M, A], y: Patch[F, S, E, M, A]) = {
+      def combine(x: Patch[M, S, E, F, A], y: Patch[M, S, E, F, A]) = {
         x.flatMap { _ => y }
       }
     }
@@ -84,22 +84,22 @@ object Patch {
   }*/
 
 
-  implicit class PatchOps[F[_], S, E, M, A](val self: Patch[F, S, E, M, A]) extends AnyVal {
+  implicit class PatchOps[M[_], S, E, F, A](val self: Patch[M, S, E, F, A]) extends AnyVal {
 
-    def map[A1, S1 >: S, E1 >: E](f: A => A1): Patch[F, S1, E1, M, A1] = Map(self, f)
+    def map[A1, S1 >: S, E1 >: E](f: A => A1): Patch[M, S1, E1, F, A1] = Map(self, f)
 
-    def flatMap[A1, S1 >: S, E1 >: E, M1, M2](
-      f: A => Patch[F, S1, E1, M1, A1])(implicit
-      derive: Derive[M, M1, M2]
-    ): Patch[F, S1, E1, M2, A1] = FlatMap(self, f, derive)
+    def flatMap[A1, S1 >: S, E1 >: E, F1, F2](
+      f: A => Patch[M, S1, E1, F1, A1])(implicit
+      derive: Derive[F, F1, F2]
+    ): Patch[M, S1, E1, F2, A1] = FlatMap(self, f, derive)
 
-    def as[A1](a: A1): Patch[F, S, E, M, A1] = self.map { _ => a }
+    def as[A1](a: A1): Patch[M, S, E, F, A1] = self.map { _ => a }
 
-    def unit: Patch[F, S, E, M, Unit] = as(())
+    def unit: Patch[M, S, E, F, Unit] = as(())
 
-    def mapEffect[M1](f: M => M1): Patch[F, S, E, M1, A] = MapEffect(self, f)
+    def mapEffect[M1](f: F => M1): Patch[M, S, E, M1, A] = MapEffect(self, f)
 
-    def effect[M1, M2](m: M1)(implicit derive: Derive[M, M1, M2]): Patch[F, S, E, M2, A] = {
+    def effect[M1, M2](m: M1)(implicit derive: Derive[F, M1, M2]): Patch[M, S, E, M2, A] = {
       for {
         a <- self
         _ <- Patch.effect(m)
@@ -109,11 +109,11 @@ object Patch {
     def apply(
       state: S,
       seqNr: SeqNr)(
-      replay: (S, E) => F[S])(implicit
-      F: Monad[F]
-    ): F[Result[S, E, M, A]] = {
+      replay: (S, E) => M[S])(implicit
+      F: Monad[M]
+    ): M[Result[S, E, F, A]] = {
 
-      def loop[A1, M1](s: S, seqNr: SeqNr, p: Patch[F, S, E, M1, A1]): F[(S, List[E], M1, A1)] = {
+      def loop[A1, F1](s: S, seqNr: SeqNr, p: Patch[M, S, E, F1, A1]): M[(S, List[E], F1, A1)] = {
         p match {
           case Default(f) =>
             f(s, seqNr).map {
@@ -140,19 +140,19 @@ object Patch {
             }
 
           case _: GetState[S] =>
-            (s, List.empty[E], (), s).pure[F]
+            (s, List.empty[E], (), s).pure[M]
 
           case GetSeqNr =>
-            (s, List.empty[E], (), seqNr).pure[F]
+            (s, List.empty[E], (), seqNr).pure[M]
 
           case Pure(a) =>
-            (s, List.empty[E], (), a).pure[F]
+            (s, List.empty[E], (), a).pure[M]
 
-          case p: Lift[F, A1] =>
-            p.fa.map { a => (s, List.empty[E], (), a) }
+          case p: Lift[M, A1] =>
+            p.ma.map { a => (s, List.empty[E], (), a) }
 
           case Effect(m) =>
-            (s, List.empty[E], m, ()).pure[F]
+            (s, List.empty[E], m, ()).pure[M]
 
           case MapEffect(p, f) =>
             loop(s, seqNr, p).map { case (s, es, m, a) => (s, es, f(m), a) }
@@ -163,14 +163,14 @@ object Patch {
     }
   }
 
-  private final case class Default[F[_], S, E, M, A](
-    f: (S, SeqNr) => F[(Option[(S, E)], M, A)]
-  ) extends Patch[F, S, E, M, A]
+  private final case class Default[M[_], S, E, F, A](
+    f: (S, SeqNr) => M[(Option[(S, E)], F, A)]
+  ) extends Patch[M, S, E, F, A]
 
 
-  private final case class Change[F[_], S, E, M, A](
-    f: (S, SeqNr) => F[(S, E, M, A)]
-  ) extends Patch[F, S, E, M, A]
+  private final case class Change[M[_], S, E, F, A](
+    f: (S, SeqNr) => M[(S, E, F, A)]
+  ) extends Patch[M, S, E, F, A]
 
 
   private final case class Event[E](
@@ -178,17 +178,17 @@ object Patch {
   ) extends Patch[Nothing, Nothing, E, Unit, Unit]
 
 
-  private final case class Map[F[_], S, E, M, A, A1](
-    p: Patch[F, S, E, M, A],
+  private final case class Map[M[_], S, E, F, A, A1](
+    p: Patch[M, S, E, F, A],
     f: A => A1
-  ) extends Patch[F, S, E, M, A1]
+  ) extends Patch[M, S, E, F, A1]
 
 
-  private final case class FlatMap[F[_], S, E, M, M1, M2, A, A1](
-    p: Patch[F, S, E, M, A],
-    f: A => Patch[F, S, E, M1, A1],
-    derive: Derive[M, M1, M2]
-  ) extends Patch[F, S, E, M2, A1]
+  private final case class FlatMap[M[_], S, E, F, F1, F2, A, A1](
+    p: Patch[M, S, E, F, A],
+    f: A => Patch[M, S, E, F1, A1],
+    derive: Derive[F, F1, F2]
+  ) extends Patch[M, S, E, F2, A1]
 
 
   private final case class Pure[A](
@@ -196,9 +196,9 @@ object Patch {
   ) extends Patch[Nothing, Nothing, Nothing, Unit, A]
 
 
-  private final case class Lift[F[_], A](
-    fa: F[A]
-  ) extends Patch[F, Nothing, Nothing, Unit, A]
+  private final case class Lift[M[_], A](
+    ma: M[A]
+  ) extends Patch[M, Nothing, Nothing, Unit, A]
 
 
   private final case class GetState[S]() extends Patch[Nothing, S, Nothing, Unit, S]
@@ -207,16 +207,16 @@ object Patch {
   private final case object GetSeqNr extends Patch[Nothing, Nothing, Nothing, Unit, SeqNr]
 
 
-  private final case class Effect[M](
-    m: M
-  ) extends Patch[Nothing, Nothing, Nothing, M, Unit]
+  private final case class Effect[F](
+    f: F
+  ) extends Patch[Nothing, Nothing, Nothing, F, Unit]
 
 
-  private final case class MapEffect[F[_], S, E, M, A, M1](
-    p: Patch[F, S, E, M, A],
-    f: M => M1
-  ) extends Patch[F, S, E, M1, A]
+  private final case class MapEffect[M[_], S, E, F, A, F1](
+    p: Patch[M, S, E, F, A],
+    f: F => F1
+  ) extends Patch[M, S, E, F1, A]
 
 
-  final case class Result[S, E, M, A](state: S, events: List[E], effect: M, value: A)
+  final case class Result[S, E, F, A](state: S, events: List[E], effect: F, value: A)
 }
