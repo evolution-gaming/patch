@@ -1,6 +1,7 @@
-package com.evolution
+package com.evolution.patch
 
 import cats.syntax.all._
+import com.evolution.patch.Derive.implicits._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -49,7 +50,7 @@ class DeriveTest extends AnyFunSuite with Matchers {
 object DeriveTest {
 
   def derive[A, B](a: A, b: B): Apply[A, B] = new Apply[A, B] {
-    def apply[C]()(implicit derive: Derive[A, B, C]): C = derive(a, b)
+    def apply[C]()(implicit derive: Derive[A, B, C]): C = a.derive(b)
   }
 
   trait Apply[A, B] {

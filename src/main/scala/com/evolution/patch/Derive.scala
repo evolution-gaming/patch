@@ -1,4 +1,4 @@
-package com.evolution
+package com.evolution.patch
 
 import cats.Apply
 import cats.syntax.all._

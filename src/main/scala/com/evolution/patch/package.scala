@@ -1,6 +1,6 @@
-package com
+package com.evolution
 
-package object evolution {
+package object patch {
 
   type SeqNr = Long
 

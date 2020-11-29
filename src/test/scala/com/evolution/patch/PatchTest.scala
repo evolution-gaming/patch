@@ -1,9 +1,9 @@
-package com.evolution
+package com.evolution.patch
 
 import cats.Id
-import cats.implicits._
 import cats.effect.IO
 import cats.effect.concurrent.Ref
+import cats.implicits._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
