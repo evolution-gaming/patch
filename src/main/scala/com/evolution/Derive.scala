@@ -15,6 +15,14 @@ object Derive extends DeriveImplicits0 {
   implicit def productRightDerive[F[_]: Apply, A]: Derive[F[Unit], F[A], F[A]] = (a, b) => a.productR(b)
 
   implicit def rightDerive[A]: Derive[Unit, A, A] = (_, a) => a
+
+
+  object implicits {
+
+    implicit class IdOpsDerive[A](val self: A) extends AnyVal {
+      def derive[B, C](b: B)(implicit derive: Derive[A, B, C]): C = derive(self, b)
+    }
+  }
 }
 
 sealed abstract class DeriveImplicits0 extends DeriveImplicits1 {

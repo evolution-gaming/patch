@@ -25,6 +25,8 @@ libraryDependencies += compilerPlugin(`kind-projector` cross CrossVersion.full)
 
 libraryDependencies ++= Seq(
   Cats.core,
+  Cats.alleycats,
+  Cats.effect % Test,
   scalatest % Test
 )
 
