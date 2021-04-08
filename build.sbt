@@ -12,14 +12,21 @@ organizationName := "Evolution"
 
 organizationHomepage := Some(url("http://evolution.com"))
 
-bintrayOrganization := Some("evolution")
-
 scalaVersion := crossScalaVersions.value.head
 
 crossScalaVersions := Seq("2.13.3", "2.12.12")
 
-resolvers += Resolver.bintrayRepo("evolutiongaming", "maven")
-resolvers += Resolver.bintrayRepo("evolution", "maven")
+def artifactory(owner: String, repo: String): MavenRepository = {
+  MavenRepository(
+    s"artifactory-$owner-$repo",
+    s"https://$owner.jfrog.io/artifactory/$repo")
+}
+
+credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
+
+resolvers += artifactory("evolution", "public")
+
+publishTo := Some(artifactory("evolution", "maven"))
 
 libraryDependencies += compilerPlugin(`kind-projector` cross CrossVersion.full)
 
