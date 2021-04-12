@@ -8,7 +8,9 @@
 ## Setup
 
 ```scala
-resolvers += Resolver.bintrayRepo("evolution", "maven")
+resolvers += sbt.librarymanagement.MavenRepository(
+  "artifactory-evolution-public",
+  "https://evolution.jfrog.io/artifactory/public")
 
-libraryDependencies += "com.evolution" %% "patch" % "0.0.1"
+libraryDependencies += "com.evolution" %% "patch" % "0.0.3"
 ```
