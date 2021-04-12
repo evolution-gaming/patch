@@ -1,4 +1,5 @@
 import Dependencies._
+import Artifactory._
 
 name := "patch"
 
@@ -16,17 +17,9 @@ scalaVersion := crossScalaVersions.value.head
 
 crossScalaVersions := Seq("2.13.3", "2.12.12")
 
-def artifactory(owner: String, repo: String): MavenRepository = {
-  MavenRepository(
-    s"artifactory-$owner-$repo",
-    s"https://$owner.jfrog.io/artifactory/$repo")
-}
+resolvers += artifactoryRepo("evolution", "public")
 
-credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
-
-resolvers += artifactory("evolution", "public")
-
-publishTo := Some(artifactory("evolution", "maven"))
+publishTo := Some(artifactoryRepo("evolution", "maven-local-releases"))
 
 libraryDependencies += compilerPlugin(`kind-projector` cross CrossVersion.full)
 
