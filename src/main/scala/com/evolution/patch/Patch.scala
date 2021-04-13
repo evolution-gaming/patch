@@ -2,7 +2,7 @@ package com.evolution.patch
 
 import alleycats.Empty
 import cats.implicits._
-import cats.{Applicative, Monad, Monoid}
+import cats.{Applicative, Monad, Monoid, StackSafeMonad}
 
 /**
   * This monadic data structure helps to describe changes to state as events
@@ -72,16 +72,21 @@ object Patch {
     }
   }
 
-  /*implicit def monadPatch[F[_]: Applicative, S, E, M: Empty](implicit
-    combine: Combine[M, M, M]
+
+  implicit def monadPatch[F[_]: Applicative, S, E, M: Empty](implicit
+    derive: Derive[M, M, M],
   ): Monad[Patch[F, S, E, M, *]] = {
     new StackSafeMonad[Patch[F, S, E, M, *]] {
 
-      def flatMap[A, B](fa: Patch[F, S, E, M, A])(f: A => Patch[F, S, E, M, B]) = fa.flatMap(f)
+      def flatMap[A, B](fa: Patch[F, S, E, M, A])(f: A => Patch[F, S, E, M, B]) = {
+        PatchOps(fa).flatMap(f)
+      }
 
-      def pure[A](a: A) = Patch.pure(a).effect(Empty[M].empty)
+      def pure[A](a: A) = {
+        Patch.pure(a).effect(Empty[M].empty)
+      }
     }
-  }*/
+  }
 
 
   implicit class PatchOps[M[_], S, E, F, A](val self: Patch[M, S, E, F, A]) extends AnyVal {
