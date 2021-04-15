@@ -1,5 +1,4 @@
 import Dependencies._
-import Artifactory._
 
 name := "patch"
 
@@ -17,7 +16,7 @@ scalaVersion := crossScalaVersions.value.head
 
 crossScalaVersions := Seq("2.13.3", "2.12.12")
 
-publishTo := Some(artifactoryRepo("evolution", "maven-local-releases"))
+publishTo := Some(Resolver.evolutionReleases)
 
 libraryDependencies += compilerPlugin(`kind-projector` cross CrossVersion.full)
 
