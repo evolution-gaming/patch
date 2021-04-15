@@ -17,8 +17,6 @@ scalaVersion := crossScalaVersions.value.head
 
 crossScalaVersions := Seq("2.13.3", "2.12.12")
 
-resolvers += artifactoryRepo("evolution", "public")
-
 publishTo := Some(artifactoryRepo("evolution", "maven-local-releases"))
 
 libraryDependencies += compilerPlugin(`kind-projector` cross CrossVersion.full)
