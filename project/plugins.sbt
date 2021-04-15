@@ -1,4 +1,4 @@
-//externalResolvers += Resolver.bintrayIvyRepo("evolutiongaming", "sbt-plugins")
+externalResolvers += Resolver.evolution
 
 addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.6.1")
 
