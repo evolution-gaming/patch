@@ -5,6 +5,47 @@
 [![Version](https://img.shields.io/badge/version-click-blue)](https://evolution.jfrog.io/artifactory/api/search/latestVersion?g=com.evolution&a=patch_2.13&repos=public)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellowgreen.svg)](https://opensource.org/licenses/MIT)
 
+`Patch` is a monadic data structure - a building block for [event-sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) application
+Here is a short example of this works
+
+```scala
+  final case class Event(value: Int)
+  
+  final case class State(value: Int)
+  
+  def enabled: IO[Boolean] = ???
+  
+  def log(msg: String): IO[Unit] = ???
+  
+  val patch: Patch[IO, State, Event, IO[Unit], Either[String, State]] = for {
+    enabled <- Patch.lift { enabled }
+    result  <- if (enabled) {
+      for {
+        before <- Patch.state[State]
+        _      <- Patch.event(Event(+1))
+        after  <- Patch.state[State]
+        seqNr  <- Patch.seqNr
+        _      <- Patch.effect { log(s"state changed from $before to $after($seqNr)") }
+      } yield {
+        after.asRight[String]
+      }
+    } else {
+      Patch
+        .effect { log("state remains the same") }
+        .as("disabled".asLeft[State])
+    }
+  } yield result
+  
+  
+  val result = patch.run(State(0), SeqNr.Min) { (state, event) =>
+    state
+      .copy(value = state.value + event.value)
+      .pure[IO]
+  }
+  
+  result // Patch.Result(State(1), List(Event(1)), IO.unit, State(1).asRight)
+```
+
 ## Setup
 
 in [`build.sbt`](https://www.scala-sbt.org/1.x/docs/Basic-Def.html#What+is+a+build+definition%3F)

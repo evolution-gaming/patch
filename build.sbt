@@ -20,11 +20,16 @@ publishTo := Some(Resolver.evolutionReleases)
 
 libraryDependencies += compilerPlugin(`kind-projector` cross CrossVersion.full)
 
+scalacOptsFailOnWarn := Some(false)
+
 libraryDependencies ++= Seq(
   Cats.core,
   Cats.alleycats,
   Cats.effect % Test,
-  scalatest % Test
+  Cats.laws % Test,
+  scalatest % Test,
+  `scalacheck-shapeless` % Test,
+  `discipline-scalatest` % Test,
 )
 
 licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
