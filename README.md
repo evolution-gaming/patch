@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellowgreen.svg)](https://opensource.org/licenses/MIT)
 
 `Patch` is a monadic data structure - a building block for [event-sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) application
-Here is a short example of this works
+Here is a short example of how this works
 
 ```scala
   final case class Event(value: Int)
@@ -18,31 +18,33 @@ Here is a short example of this works
   def log(msg: String): IO[Unit] = ???
   
   val patch: Patch[IO, State, Event, IO[Unit], Either[String, State]] = for {
-    enabled <- Patch.lift { enabled }
+    enabled <- Patch.lift { enabled } // you might need to execute effect in order to decide on how to proceed
     result  <- if (enabled) {
       for {
         before <- Patch.state[State]
-        _      <- Patch.event(Event(+1))
-        after  <- Patch.state[State]
-        seqNr  <- Patch.seqNr
-        _      <- Patch.effect { log(s"state changed from $before to $after($seqNr)") }
+        _      <- Patch.event(Event(+1)) // event to be appended
+        after  <- Patch.state[State] // state after event is applied
+        seqNr  <- Patch.seqNr // seqNr at this point
+        _      <- Patch.effect { log(s"state changed from $before to $after($seqNr)") } // side effect to be executed 
       } yield {
         after.asRight[String]
       }
     } else {
+      // you might not produce any events and just have side effect
       Patch
         .effect { log("state remains the same") }
         .as("disabled".asLeft[State])
     }
   } yield result
   
-  
+  // now we can run our `Patch` by passing initial state, seqNr and `replay` function `(state, event) => state`   
   val result = patch.run(State(0), SeqNr.Min) { (state, event) =>
     state
       .copy(value = state.value + event.value)
       .pure[IO]
   }
-  
+
+  // here we have resulting state, list of all events, composition of side effects to be executed in case events are successfully persisted
   result // Patch.Result(State(1), List(Event(1)), IO.unit, State(1).asRight)
 ```
 
@@ -52,5 +54,5 @@ in [`build.sbt`](https://www.scala-sbt.org/1.x/docs/Basic-Def.html#What+is+a+bui
 ```scala
 addSbtPlugin("com.evolution" % "sbt-artifactory-plugin" % "0.0.2")
 
-libraryDependencies += "com.evolution" %% "patch" % "0.0.3"
+libraryDependencies += "com.evolution" %% "patch" % "0.0.5"
 ```
