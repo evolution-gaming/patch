@@ -79,7 +79,56 @@ class PatchTest extends AnyFunSuite with Matchers {
     val expected = Patch.Result(2, List("e0", "e1"), "f", "a")
     patch
       .narrow[Id, Int, String]
-      .run(0, SeqNr.Min) { case (s, _) => (s + 1).pure[Id] } shouldEqual expected.pure[Id]
+      .run(0, SeqNr.Min) { (s, _) => (s + 1).pure[Id] } shouldEqual expected.pure[Id]
+  }
+
+  test("all complex") {
+    def lift[A](a: A): Patch[Id, Nothing, Nothing, Unit, A] = {
+      for {
+        _ <- Patch.effect(())
+        a <- Patch.pure(a)
+        _ <- Patch.effect(())
+        a <- Patch.lift(a.pure[Id])
+        _ <- Patch.effect(())
+      } yield a
+    }
+    val patch0 = for {
+      a <- Patch.seqNr
+      a <- lift(a)
+      _ <- Patch.event(a.toString)
+      b <- Patch.state[SeqNr]
+      b <- lift(b)
+      c <- Patch.seqNr
+      _ <- Patch.effect(c.toString)
+      d <- Patch.change[SeqNr] { (s, seqNr) => (s + 1, seqNr.toString, (), (a, b, seqNr.toString)).pure[Id] }
+      d <- lift(d)
+    } yield d
+
+    val patch1 = for {
+      a <- patch0
+      a <- lift(a)
+
+      x <- Patch.seqNr
+      _ <- Patch.event(s"x$x")
+
+      b <- patch0
+      b <- lift(b)
+
+      x <- Patch.seqNr
+      _ <- Patch.event(s"x$x")
+
+      c <- patch0
+      c <- lift(c)
+    } yield {
+      (a, b, c)
+    }
+
+    val expected = Patch.Result(
+      8L,
+      List("0", "1", "x2", "3", "4", "x5", "6", "7"),
+      ("1", ("4", "7")),
+      ((0L, 1L, "1"), (3L, 4L, "4"), (6L, 7L, "7")))
+    patch1.run(0L, SeqNr.Min) { (s, _) => (s + 1).pure[Id] } shouldEqual expected.pure[Id]
   }
 
   test("map/flatMap") {
@@ -160,10 +209,8 @@ class PatchTest extends AnyFunSuite with Matchers {
     val patch = for {
       a <- Patch.seqNr
       _ <- Patch.event(())
-      b <- Patch.seqNr
-      _ <- Patch.event(())
-      _ <- Patch.event(())
-      c <- Patch.seqNr
+      b <- Patch.seqNr.narrow[Id, Unit, Unit].productL { Patch.event(()) }
+      c <- Patch.event(()).productR { Patch.seqNr }
     } yield {
       (a, b, c)
     }
@@ -250,12 +297,12 @@ class PatchTest extends AnyFunSuite with Matchers {
 
   test("combine complex effect") {
     val patch = for {
-      _ <- Patch.effect(0.some)
+      _ <- Patch.effect(0.some).map {  _ => ()}
       _ <- Patch.effect(())
-      _ <- Patch.effect("a".some)
+      _ <- Patch.effect("a".some).flatMap { _ => Patch.unit }
       _ <- Patch.effect(().some)
-      _ <- Patch.effect("b".some)
-      _ <- Patch.effect(().some)
+      _ <- Patch.unit.flatMap { _ => Patch.effect("b".some) }
+      _ <- Patch.effect(().some).unit
       _ <- Patch.effect(())
     } yield {}
 
@@ -300,14 +347,37 @@ class PatchTest extends AnyFunSuite with Matchers {
   test("change") {
     val expected = Patch.Result(1, List("e"), "f".pure[Id], "a")
     Patch
-      .change[Int] { case (s, _) => (s + 1, "e", "f".pure[Id], "a").pure[Id] }
+      .change[Int] { (s, _) => (s + 1, "e", "f".pure[Id], "a").pure[Id] }
       .run(0, SeqNr.Min) { (s, _) => (s + 1).pure[Id] } shouldEqual expected
+  }
+
+  test("change/flatMap") {
+    def change(a: String) = {
+      Patch.change[List[(String, SeqNr)]] { (s, seqNr) =>
+        ((a, seqNr) :: s, seqNr, seqNr.pure[Id], seqNr).pure[Id]
+      }
+    }
+    val patch = for {
+      _ <- for {
+        _ <- change("a")
+        _ <- change("b")
+      } yield {}
+      _ <- change("c")
+    } yield {}
+
+    val expected = Patch.Result(
+      state = List(("c", 2), ("b", 1), ("a", 0)),
+      events = List(0, 1, 2),
+      effect = ((0, 1), 2),
+      value = ())
+    patch
+      .run(List.empty, SeqNr.Min) { (s, seqNr) => (("x", seqNr) :: s).pure[Id] } shouldEqual expected
   }
 
   test("default") {
     val expected = Patch.Result(1, List("e"), "f".pure[Id], "a")
     Patch
-      .apply[Int] { case (s, _) => ((s + 1, "e").some, "f".pure[Id], "a").pure[Id] }
+      .apply[Int] { (s, _) => ((s + 1, "e").some, "f".pure[Id], "a").pure[Id] }
       .run(0, SeqNr.Min) { (s, _) => (s + 1).pure[Id] } shouldEqual expected
   }
 

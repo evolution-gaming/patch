@@ -182,6 +182,7 @@ object Patch extends PatchImplicits0 {
 
   implicit class PatchOps[M[_], S, E, F, A](val self: Patch[M, S, E, F, A]) extends AnyVal {
 
+    // TODO add SeqNr to `replay`
     def run(
       state: S,
       seqNr: SeqNr)(

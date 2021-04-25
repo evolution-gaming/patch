@@ -18,7 +18,7 @@ private[patch] object RunPatch {
 
     type P = Patch[M, S, E, Any, Any]
     type D = Any => Any
-    type X = (Any, Any) => M[(D, P)]
+    type X = (Any, Any) => M[(List[D], P)]
     type L = (S, SeqNr, List[E], List[D], P, List[X])
     type R = Result[S, E, Any, Any]
 
@@ -26,18 +26,13 @@ private[patch] object RunPatch {
       .tailRecM[M, R] { case (s, seqNr, es, ds, p, xs) =>
 
         def result(s: S, seqNr: SeqNr, es: List[E], ds: List[D], f: Any, a: Any): M[Either[L, R]] = {
+          val f1 = ds.foldLeft(f) { (f, d) => d(f) }
           xs match {
             case Nil =>
-              Result(
-                state = s,
-                events = es,
-                effect = ds.foldLeft(f) { (f, d) => d(f) },
-                value = a)
-                .asRight[L]
-                .pure[M]
+              Result(state = s, events = es, effect = f1, value = a).asRight[L].pure[M]
 
             case x :: xs =>
-              x(f, a).map { case (d, p) => (s, seqNr, es, d :: ds, p, xs).asLeft[R] }
+              x(f1, a).map { case (ds, p) => (s, seqNr, es, ds, p, xs).asLeft[R] }
           }
         }
 
@@ -51,9 +46,9 @@ private[patch] object RunPatch {
             val x: X = (f, a) => {
               val p2 = p1.f(a)
               val d: D = f1 => p1.derive(f, f1)
-              (d, p2).pure[M]
+              (d :: ds, p2).pure[M]
             }
-            (s, seqNr, es, ds, p1.patch, x :: xs)
+            (s, seqNr, es, List.empty[D], p1.patch, x :: xs)
               .asLeft[R]
               .pure[M]
 
@@ -62,9 +57,9 @@ private[patch] object RunPatch {
             val x: X = (f, a) => {
               val p2 = Pure(p1.f(a)).asInstanceOf[P]
               val d: D = _ => f
-              (d, p2).pure[M]
+              (d :: ds, p2).pure[M]
             }
-            (s, seqNr, es, ds, p1.patch, x :: xs)
+            (s, seqNr, es, List.empty[D], p1.patch, x :: xs)
               .asLeft[R]
               .pure[M]
 
