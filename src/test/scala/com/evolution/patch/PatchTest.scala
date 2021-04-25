@@ -211,7 +211,7 @@ class PatchTest extends AnyFunSuite with Matchers {
       a <- Patch.seqNr
       _ <- Patch.event(())
       b <- Patch.seqNr.narrow[Id, Unit, Unit].productL { Patch.event(()) }
-      c <- Patch.event(()).productR { Patch.seqNr }
+      c <- Patch.event(()).narrow[Id, Unit, Unit].productR { Patch.seqNr }
     } yield {
       (a, b, c)
     }
