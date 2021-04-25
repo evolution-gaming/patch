@@ -37,12 +37,12 @@ class ExampleTest extends AnyFunSuite with Matchers {
     } yield result
 
 
-    val result = patch.run(State(0), SeqNr.Min) { (state, event) =>
+    val result = patch.run(State(0), SeqNr.Min) { (state, event, _) =>
       state
         .copy(value = state.value + event.value)
         .pure[IO]
     }
 
-    result.unsafeRunSync() shouldEqual Patch.Result(State(1), List(Event(1)), IO.unit, State(1).asRight)
+    result.unsafeRunSync() shouldEqual Patch.Result(State(1), 1L, List(Event(1)), IO.unit, State(1).asRight)
   }
 }

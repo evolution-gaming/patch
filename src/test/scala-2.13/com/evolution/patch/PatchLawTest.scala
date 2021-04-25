@@ -14,7 +14,7 @@ class PatchLawTest extends AnyFunSuite with FunSuiteDiscipline with Configuratio
 
   implicit def eqPatch[A: Eq]: Eq[Patch[A]] = (x: Patch[A], y: Patch[A]) => {
 
-    def run(patch: Patch[A]) = patch.run((), SeqNr.Min) { (_, _) => () }
+    def run(patch: Patch[A]) = patch.run((), SeqNr.Min) { (_, _, _) => () }
 
     run(x) === run(y)
   }

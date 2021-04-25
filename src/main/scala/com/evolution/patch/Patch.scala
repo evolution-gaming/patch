@@ -177,16 +177,15 @@ object Patch extends PatchImplicits0 {
   }
 
 
-  final case class Result[S, E, F, A](state: S, events: List[E], effect: F, value: A)
+  final case class Result[S, E, F, A](state: S, seqNr: SeqNr, events: List[E], effect: F, value: A)
 
 
   implicit class PatchOps[M[_], S, E, F, A](val self: Patch[M, S, E, F, A]) extends AnyVal {
 
-    // TODO add SeqNr to `replay`
     def run(
       state: S,
       seqNr: SeqNr)(
-      replay: (S, E) => M[S])(implicit
+      replay: (S, E, SeqNr) => M[S])(implicit
       M: Monad[M]
     ): M[Result[S, E, F, A]] = {
       RunPatch(self, state, seqNr, replay)

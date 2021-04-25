@@ -38,7 +38,7 @@ Here is a short example of how this works
   } yield result
   
   // now we can run our `Patch` by passing initial state, seqNr and `replay` function `(state, event) => state`   
-  val result = patch.run(State(0), SeqNr.Min) { (state, event) =>
+  val result = patch.run(State(0), SeqNr.Min) { (state, event, seqNr) =>
     state
       .copy(value = state.value + event.value)
       .pure[IO]

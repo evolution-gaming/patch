@@ -76,10 +76,10 @@ class PatchTest extends AnyFunSuite with Matchers {
       _ <- Patch.change[Int] { (s, _) => (s + 1, "e1", (), ()).pure[Id] }
     } yield a
 
-    val expected = Patch.Result(2, List("e0", "e1"), "f", "a")
+    val expected = Patch.Result(2, 2L, List("e0", "e1"), "f", "a")
     patch
       .narrow[Id, Int, String]
-      .run(0, SeqNr.Min) { (s, _) => (s + 1).pure[Id] } shouldEqual expected.pure[Id]
+      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] } shouldEqual expected.pure[Id]
   }
 
   test("all complex") {
@@ -124,11 +124,12 @@ class PatchTest extends AnyFunSuite with Matchers {
     }
 
     val expected = Patch.Result(
-      8L,
-      List("0", "1", "x2", "3", "4", "x5", "6", "7"),
-      ("1", ("4", "7")),
-      ((0L, 1L, "1"), (3L, 4L, "4"), (6L, 7L, "7")))
-    patch1.run(0L, SeqNr.Min) { (s, _) => (s + 1).pure[Id] } shouldEqual expected.pure[Id]
+      state = 8L,
+      seqNr = 8L,
+      events = List("0", "1", "x2", "3", "4", "x5", "6", "7"),
+      effect = ("1", ("4", "7")),
+      value = ((0L, 1L, "1"), (3L, 4L, "4"), (6L, 7L, "7")))
+    patch1.run(0L, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] } shouldEqual expected.pure[Id]
   }
 
   test("map/flatMap") {
@@ -161,9 +162,9 @@ class PatchTest extends AnyFunSuite with Matchers {
           List(a, b, c, d, e)
         }
         patch.run(0, 1L) {
-          case (s, "inc") => (s + 1).pure[IO]
-          case (s, "dec") => (s - 1).pure[IO]
-          case (s, _)     => s.pure[IO]
+          case (s, "inc", _) => (s + 1).pure[IO]
+          case (s, "dec", _) => (s - 1).pure[IO]
+          case (s, _, _)     => s.pure[IO]
         }
       }
 
@@ -181,28 +182,28 @@ class PatchTest extends AnyFunSuite with Matchers {
   }
 
   test("pure") {
-    val expected = Patch.Result((), List.empty, (), "a")
+    val expected = Patch.Result((), SeqNr.Min, List.empty, (), "a")
     Patch
       .pure("a")
       .narrow[Id, Unit, Unit]
-      .run((), SeqNr.Min) { (_, _) => ().pure[Id] } shouldEqual expected.pure[Id]
+      .run((), SeqNr.Min) { (_, _, _) => ().pure[Id] } shouldEqual expected.pure[Id]
   }
 
   test("lift") {
-    val expected = Patch.Result((), List.empty, (), "a")
+    val expected = Patch.Result((), SeqNr.Min, List.empty, (), "a")
     Patch
       .lift("a".pure[Id])
       .narrow[Id, Unit, Unit]
-      .run((), SeqNr.Min) { (_, _) => ().pure[Id] } shouldEqual expected.pure[Id]
+      .run((), SeqNr.Min) { (_, _, _) => ().pure[Id] } shouldEqual expected.pure[Id]
   }
 
   test("map") {
-    val expected = Patch.Result((), List.empty, (), "0")
+    val expected = Patch.Result((), SeqNr.Min, List.empty, (), "0")
     Patch
       .pure(0)
       .map { _.toString }
       .narrow[Id, Unit, Unit]
-      .run((), SeqNr.Min) { (_, _) => ().pure[Id] } shouldEqual expected.pure[Id]
+      .run((), SeqNr.Min) { (_, _, _) => ().pure[Id] } shouldEqual expected.pure[Id]
   }
 
   test("seqNr") {
@@ -218,16 +219,16 @@ class PatchTest extends AnyFunSuite with Matchers {
     val expected = (10, 11, 13)
     patch
       .narrow[Id, Unit, Unit]
-      .run((), 10) { (_, _) => ().pure[Id] }
+      .run((), 10) { (_, _, _) => ().pure[Id] }
       .value shouldEqual expected
   }
 
   test("state") {
-    val expected = Patch.Result("state", List.empty, (), "state")
+    val expected = Patch.Result("state", SeqNr.Min, List.empty, (), "state")
     Patch
       .state[String]
       .narrow[Id, String, Unit]
-      .run("state", SeqNr.Min) { (s, _) => s.pure[Id] } shouldEqual expected.pure[Id]
+      .run("state", SeqNr.Min) { (s, _, _) => s.pure[Id] } shouldEqual expected.pure[Id]
   }
 
   test("event") {
@@ -245,17 +246,17 @@ class PatchTest extends AnyFunSuite with Matchers {
       _ <- Patch.event(E.B)
       c <- Patch.state[Int]
     } yield (a, b, c)
-    val expected = Patch.Result(2, List(E.A, E.B), ().pure[Id], (0, 1, 2))
+    val expected = Patch.Result(2, 2L, List(E.A, E.B), ().pure[Id], (0, 1, 2))
     patch
       .monadNarrow[Try]
-      .run(0, SeqNr.Min) { (s, _) => (s + 1).pure[Try] } shouldEqual expected.pure[Try]
+      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Try] } shouldEqual expected.pure[Try]
   }
 
   test("effect") {
     Patch
       .effect(0)
       .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int) => (s + 1).pure[Id] }
+      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
       .effect shouldEqual 0
   }
 
@@ -264,7 +265,7 @@ class PatchTest extends AnyFunSuite with Matchers {
       .effect(0)
       .flatMap { _ => Patch.unit }
       .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int) => (s + 1).pure[Id] }
+      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
       .effect shouldEqual 0
   }
 
@@ -279,7 +280,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
     patch
       .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int) => (s + 1).pure[Id] }
+      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
       .effect shouldEqual (0 -> ("a" -> "b"))
   }
 
@@ -291,7 +292,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
     patch
       .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int) => (s + 1).pure[Id] }
+      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
       .effect shouldEqual (0, "a").some
   }
 
@@ -308,7 +309,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
     patch
       .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int) => (s + 1).pure[Id] }
+      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
       .effect shouldEqual (0, ("a", "b")).some
   }
 
@@ -330,7 +331,7 @@ class PatchTest extends AnyFunSuite with Matchers {
       }(`-`)
 
     patch
-      .run(0, SeqNr.Min) { (s, _: Int) => (s + 1).pure[Id] }
+      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
       .effect shouldEqual 0
   }
 
@@ -340,15 +341,15 @@ class PatchTest extends AnyFunSuite with Matchers {
       .flatMap { _ => Patch.effect("1".pure[Try]) }
       .effectMap { _.toOption }
       .narrow[Id, Unit, Unit]
-      .run((), SeqNr.Min) { (_, _) => ().pure[Id] }
+      .run((), SeqNr.Min) { (_, _, _) => ().pure[Id] }
       .effect shouldEqual (0, "1").some
   }
 
   test("change") {
-    val expected = Patch.Result(1, List("e"), "f".pure[Id], "a")
+    val expected = Patch.Result(1, 1L, List("e"), "f".pure[Id], "a")
     Patch
       .change[Int] { (s, _) => (s + 1, "e", "f".pure[Id], "a").pure[Id] }
-      .run(0, SeqNr.Min) { (s, _) => (s + 1).pure[Id] } shouldEqual expected
+      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] } shouldEqual expected
   }
 
   test("change/flatMap") {
@@ -367,18 +368,19 @@ class PatchTest extends AnyFunSuite with Matchers {
 
     val expected = Patch.Result(
       state = List(("c", 2), ("b", 1), ("a", 0)),
+      seqNr = 3L,
       events = List(0, 1, 2),
       effect = ((0, 1), 2),
       value = ())
     patch
-      .run(List.empty, SeqNr.Min) { (s, seqNr) => (("x", seqNr) :: s).pure[Id] } shouldEqual expected
+      .run(List.empty, SeqNr.Min) { (s, seqNr, _) => (("x", seqNr) :: s).pure[Id] } shouldEqual expected
   }
 
   test("default") {
-    val expected = Patch.Result(1, List("e"), "f".pure[Id], "a")
+    val expected = Patch.Result(1, 1L, List("e"), "f".pure[Id], "a")
     Patch
       .apply[Int] { (s, _) => ((s + 1, "e").some, "f".pure[Id], "a").pure[Id] }
-      .run(0, SeqNr.Min) { (s, _) => (s + 1).pure[Id] } shouldEqual expected
+      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] } shouldEqual expected
   }
 
   test("stack safe") {
@@ -386,7 +388,7 @@ class PatchTest extends AnyFunSuite with Matchers {
     List
       .fill(10000) { patch }
       .foldA
-      .run(0, SeqNr.Min) { (s, _) => (s + 1).pure[Id] }
+      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] }
       .state shouldEqual 0
   }
 
@@ -396,7 +398,7 @@ class PatchTest extends AnyFunSuite with Matchers {
     List
       .fill(10000) { patch }
       .reduceLeft { (a, b) => a.flatMap { _ => b }(derive) }
-      .run(0, SeqNr.Min) { (s, _) => s.pure[Id] }
+      .run(0, SeqNr.Min) { (s, _, _) => s.pure[Id] }
       .effect shouldEqual 10000
   }
 }

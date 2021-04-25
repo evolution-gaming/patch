@@ -12,7 +12,7 @@ private[patch] object RunPatch {
     patch: Patch[M, S, E, F, A],
     state: S,
     seqNr: SeqNr,
-    replay: (S, E) => M[S])(implicit
+    replay: (S, E, SeqNr) => M[S])(implicit
     M: Monad[M]
   ): M[Result[S, E, F, A]] = {
 
@@ -29,7 +29,7 @@ private[patch] object RunPatch {
           val f1 = ds.foldLeft(f) { (f, d) => d(f) }
           xs match {
             case Nil =>
-              Result(state = s, events = es, effect = f1, value = a).asRight[L].pure[M]
+              Result(state = s, seqNr = seqNr, events = es, effect = f1, value = a).asRight[L].pure[M]
 
             case x :: xs =>
               x(f1, a).map { case (ds, p) => (s, seqNr, es, ds, p, xs).asLeft[R] }
@@ -71,7 +71,8 @@ private[patch] object RunPatch {
 
           case 4 =>
             val e = p.asInstanceOf[Event[E]].value
-            replay(s, e).flatMap { s => result(s, seqNr + 1, e :: es, ds, (), ()) }
+            val seqNr1 = seqNr + 1
+            replay(s, e, seqNr1).flatMap { s => result(s, seqNr1, e :: es, ds, (), ()) }
 
           case 5 =>
             val f = p.asInstanceOf[Effect[Any]].value
