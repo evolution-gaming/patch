@@ -45,7 +45,7 @@ Here is a short example of how this works
   }
 
   // here we have resulting state, list of all events, composition of side effects to be executed in case events are successfully persisted
-  result // Patch.Result(State(1), List(Event(1)), IO.unit, State(1).asRight)
+  result // IO(Patch.Result(State(1), List(Event(1)), IO.unit, State(1).asRight))
 ```
 
 ## Setup
