@@ -313,6 +313,17 @@ class PatchTest extends AnyFunSuite with Matchers {
       .effect shouldEqual (0, ("a", "b")).some
   }
 
+  test("combine unit effect") {
+    val patch: Patch[Id, Unit, Unit, Unit, Unit] = for {
+      _ <- Patch.effect(())
+      _ <- Patch.effect(())
+    } yield {}
+    val expected = ()
+    patch
+      .run(List.empty, SeqNr.Min) { (s, _, _) => s.pure[Id] }
+      .effect shouldEqual expected
+  }
+
   test("effect with custom derivation") {
     val `+`: Derive[Int, Int, Int] = _ + _
     val `-`: Derive[Int, Int, Int] = _ - _
