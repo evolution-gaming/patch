@@ -13,36 +13,45 @@ class ExampleTest extends AnyFunSuite with Matchers {
 
     final case class State(value: Int)
 
-    def enabled: IO[Boolean] = IO.pure(true)
+    // we need this to make compiler happy
+    implicit val maker = Patch.Maker[IO, State, Event]
 
-    def log(msg: String): IO[Unit] = IO.unit
-
-    val patch: Patch[IO, State, Event, IO[Unit], Either[String, State]] = for {
-      enabled <- Patch.lift { enabled }
-      result  <- if (enabled) {
-        for {
-          before <- Patch.state[State]
-          _      <- Patch.event(Event(+1))
-          after  <- Patch.state[State]
-          seqNr  <- Patch.seqNr
-          _      <- Patch.effect { log(s"state changed from $before to $after($seqNr)") }
-        } yield {
-          after.asRight[String]
-        }
-      } else {
-        Patch
-          .effect { log("state remains the same") }
-          .as("disabled".asLeft[State])
-      }
-    } yield result
-
-
-    val result = patch.run(State(0), SeqNr.Min) { (state, event, _) =>
+    // how to apply newly issued event to state
+    implicit val change = Patch.Change[State, Event] { (state, seqNr, event) =>
       state
         .copy(value = state.value + event.value)
         .pure[IO]
     }
 
-    result.unsafeRunSync() shouldEqual Patch.Result(State(1), 1L, List(Event(1)), IO.unit, State(1).asRight)
+    import com.evolution.patch.Patch.implicits._ // adds nice syntax
+
+    def enabled: IO[Boolean] = IO.pure(true)
+
+    def log(msg: String): IO[Unit] = IO.unit
+
+    val patch: Patch[IO, State, Event, IO[Unit], Either[String, State]] = for {
+      enabled <- enabled.patchLift // you might need to execute effect in order to decide on how to proceed
+      result  <- if (enabled) {
+        for {
+          before <- Patch.state
+          _      <- Event(+1).patchEvent // event to be appended
+          after  <- Patch.state // state after event is applied
+          seqNr  <- Patch.seqNr // seqNr at this point
+          _      <- log(s"state changed from $before to $after($seqNr)").patchEffect
+        } yield {
+          after.asRight[String]
+        }
+      } else {
+        // you might not produce any events and just have side effect
+        log("state remains the same")
+          .patchEffect
+          .as("disabled".asLeft[State])
+      }
+    } yield result
+
+    // now we can run our `Patch` by passing initial `state` and `seqNr`
+    patch
+      .run(State(0), SeqNr.Min)
+      .unsafeRunSync() shouldEqual Patch.Result(State(1), 1L, List(Event(1)), IO.unit, State(1).asRight)
   }
 }

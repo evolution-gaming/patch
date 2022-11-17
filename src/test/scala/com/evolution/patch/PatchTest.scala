@@ -1,9 +1,11 @@
 package com.evolution.patch
 
 import cats.Id
+import cats.arrow.FunctionK
 import cats.effect.IO
 import cats.effect.concurrent.Ref
-import cats.implicits._
+import cats.syntax.all._
+import com.evolution.patch.Patch.implicits._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -11,96 +13,47 @@ import scala.util.Try
 
 class PatchTest extends AnyFunSuite with Matchers {
 
-  test("Pure.toString") {
-    Patch
-      .pure("pure")
-      .toString shouldEqual "Patch(pure)"
-  }
-
-  test("Effect.toString") {
-    Patch
-      .effect("effect")
-      .toString shouldEqual "Effect(effect)"
-  }
-
-  test("Lift.toString") {
-    Patch
-      .lift("lift".pure[Id])
-      .toString shouldEqual "Lift(lift)"
-  }
-
-  test("State.toString") {
-    Patch
-      .state[Int]
-      .toString shouldEqual "State"
-  }
-
-  test("SeqNr.toString") {
-    Patch
-      .seqNr
-      .toString shouldEqual "SeqNr"
-  }
-
-  test("FlatMap.toString") {
-    Patch
-      .pure("pure")
-      .flatMap {
-        new Function1[String, Patch[Nothing, Nothing, Nothing, Unit, Unit]] {
-          def apply(a: String) = Patch.unit
-          override def toString() = "f"
-        }
-      }
-      .toString shouldEqual "FlatMap(Patch(pure),f,Derive.right)"
-  }
-
-  test("Map.toString") {
-    Patch
-      .pure("pure")
-      .map {
-        new Function1[String, Unit] {
-          def apply(a: String) = ()
-          override def toString() = "f"
-        }
-      }
-      .toString shouldEqual "Map(Patch(pure),f)"
-  }
-
   test("all") {
+    implicit val P      = Patch.Maker[Id, Int, String]
+    implicit val change = Patch.Change[Int, String] { (state, _, _) => (state + 1).pure[Id] }
     val patch = for {
-      _ <- Patch.pure("")
-      a <- Patch.lift("a".pure[Id])
-      _ <- Patch.effect("f".pure[Id])
-      _ <- Patch.event("e0")
-      _ <- Patch.state[Int]
-      _ <- Patch.seqNr
-      _ <- Patch.change[Int] { (s, _) => (s + 1, "e1", (), ()).pure[Id] }
+      _ <- ().patch[Id, Int, String]
+      a <- P.lift { "a".pure[Id] }
+      _ <- P.effect { "f".pure[Id] }
+      _ <- P.event("e0")
+      _ <- P.state
+      _ <- P.seqNr
+      _ <- P.change { (s, _) => (s + 1, "e1", (), ()).pure[Id] }
     } yield a
-
-    val expected = Patch.Result(2, 2L, List("e0", "e1"), "f", "a")
     patch
-      .narrow[Id, Int, String]
-      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] } shouldEqual expected.pure[Id]
+      .run(0, SeqNr.Min) shouldEqual Patch
+      .Result
+      .apply(2, 2L, List("e0", "e1"), "f", "a")
+      .pure[Id]
   }
 
   test("all complex") {
-    def lift[A](a: A): Patch[Id, Nothing, Nothing, Unit, A] = {
+    implicit val P      = Patch.Maker[Id, SeqNr, String]
+    implicit val change = Patch.Change[SeqNr, String] { (s, _, _) => (s + 1).pure[Id] }
+
+    def lift[A](a: A) = {
       for {
-        _ <- Patch.effect(())
-        a <- Patch.pure(a)
-        _ <- Patch.effect(())
-        a <- Patch.lift(a.pure[Id])
-        _ <- Patch.effect(())
+        _ <- ().patchEffect
+        a <- a.patch
+        _ <- ().patchEffect
+        a <- a.pure[Id].patchLift
+        _ <- ().patchEffect
       } yield a
     }
     val patch0 = for {
-      a <- Patch.seqNr
+      a <- P.seqNr
       a <- lift(a)
-      _ <- Patch.event(a.toString)
-      b <- Patch.state[SeqNr]
+      _ <- P.event(a.toString)
+      b <- P.state
       b <- lift(b)
-      c <- Patch.seqNr
-      _ <- Patch.effect(c.toString)
-      d <- Patch.change[SeqNr] { (s, seqNr) => (s + 1, seqNr.toString, (), (a, b, seqNr.toString)).pure[Id] }
+      c <- P.seqNr
+      _ <- c.toString.patchEffect
+      d <- P.change { (s, seqNr) => (s + 1, seqNr.toString, (), (a, b, seqNr.toString)).pure[Id] }
       d <- lift(d)
     } yield d
 
@@ -108,14 +61,14 @@ class PatchTest extends AnyFunSuite with Matchers {
       a <- patch0
       a <- lift(a)
 
-      x <- Patch.seqNr
-      _ <- Patch.event(s"x$x")
+      x <- P.seqNr
+      _ <- P.event(s"x$x")
 
       b <- patch0
       b <- lift(b)
 
-      x <- Patch.seqNr
-      _ <- Patch.event(s"x$x")
+      x <- P.seqNr
+      _ <- P.event(s"x$x")
 
       c <- patch0
       c <- lift(c)
@@ -123,31 +76,36 @@ class PatchTest extends AnyFunSuite with Matchers {
       (a, b, c)
     }
 
-    val expected = Patch.Result(
-      state = 8L,
-      seqNr = 8L,
-      events = List("0", "1", "x2", "3", "4", "x5", "6", "7"),
-      effect = ("1", ("4", "7")),
-      value = ((0L, 1L, "1"), (3L, 4L, "4"), (6L, 7L, "7")))
-    patch1.run(0L, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] } shouldEqual expected.pure[Id]
+    patch1
+      .run(0L, SeqNr.Min) shouldEqual Patch
+      .Result
+      .apply(
+        state  = 8L,
+        seqNr  = 8L,
+        events = List("0", "1", "x2", "3", "4", "x5", "6", "7"),
+        effect = ("1", ("4", "7")),
+        value  = ((0L, 1L, "1"), (3L, 4L, "4"), (6L, 7L, "7"))
+      )
+      .pure[Id]
   }
 
   test("map/flatMap") {
+    implicit val P = Patch.Maker[IO, Int, String]
 
     val result = for {
-      logs   <- Ref[IO].of(List.empty[String])
+      logs <- Ref[IO].of(List.empty[String])
       result <- {
-        val inc = Patch[Int] { (state, seqNr) =>
+        val inc = P.apply { (state, seqNr) =>
           val effect = logs.update { "+1" :: _ }
           ((state + 1, "inc").some, effect, seqNr).pure[IO]
         }
 
-        val dec = Patch[Int] { (state, seqNr) =>
+        val dec = P.apply { (state, seqNr) =>
           val effect = logs.update { "-1" :: _ }
           ((state - 1, "dec").some, effect, seqNr).pure[IO]
         }
 
-        val empty = Patch[Int] { (_, seqNr) =>
+        val empty = P.apply { (_, seqNr) =>
           val effect = logs.update { "empty" :: _ }
           (none[(Int, String)], effect, seqNr).pure[IO]
         }
@@ -161,13 +119,8 @@ class PatchTest extends AnyFunSuite with Matchers {
         } yield {
           List(a, b, c, d, e)
         }
-        patch.run(0, 1L) {
-          case (s, "inc", _) => (s + 1).pure[IO]
-          case (s, "dec", _) => (s - 1).pure[IO]
-          case (s, _, _)     => s.pure[IO]
-        }
+        patch.run(0, 1L)
       }
-
       _  = result.value shouldEqual List(1L, 2L, 3L, 4L, 4L)
       _  = result.state shouldEqual 2
       _  = result.events shouldEqual List("inc", "dec", "inc", "inc")
@@ -182,193 +135,229 @@ class PatchTest extends AnyFunSuite with Matchers {
   }
 
   test("pure") {
-    val expected = Patch.Result((), SeqNr.Min, List.empty, (), "a")
-    Patch
-      .pure("a")
-      .narrow[Id, Unit, Unit]
-      .run((), SeqNr.Min) { (_, _, _) => ().pure[Id] } shouldEqual expected.pure[Id]
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    ()
+      .patch
+      .run((), SeqNr.Min) shouldEqual Patch
+      .Result
+      .apply((), SeqNr.Min, List.empty, (), ())
+      .pure[Id]
   }
 
   test("lift") {
-    val expected = Patch.Result((), SeqNr.Min, List.empty, (), "a")
-    Patch
-      .lift("a".pure[Id])
-      .narrow[Id, Unit, Unit]
-      .run((), SeqNr.Min) { (_, _, _) => ().pure[Id] } shouldEqual expected.pure[Id]
+    implicit val P = Patch.Maker[Id, Unit, Int]
+    "a"
+      .pure[Id]
+      .patchLift
+      .run((), SeqNr.Min) shouldEqual Patch
+      .Result
+      .apply((), SeqNr.Min, List.empty, (), "a")
+      .pure[Id]
   }
 
   test("map") {
-    val expected = Patch.Result((), SeqNr.Min, List.empty, (), "0")
-    Patch
-      .pure(0)
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    ()
+      .patch
       .map { _.toString }
-      .narrow[Id, Unit, Unit]
-      .run((), SeqNr.Min) { (_, _, _) => ().pure[Id] } shouldEqual expected.pure[Id]
+      .run((), SeqNr.Min) shouldEqual Patch
+      .Result
+      .apply((), SeqNr.Min, List.empty, (), "()")
+      .pure[Id]
   }
 
   test("seqNr") {
+    implicit val P      = Patch.Maker[Id, Unit, Unit]
+    implicit val change = Patch.Change.const[Unit](().pure[Id])
     val patch = for {
-      a <- Patch.seqNr
-      _ <- Patch.event(())
-      b <- Patch.seqNr.narrow[Id, Unit, Unit].productL { Patch.event(()) }
-      c <- Patch.event(()).narrow[Id, Unit, Unit].productR { Patch.seqNr }
+      a <- P.seqNr
+      _ <- ().patchEvent
+      b <- P.seqNr
+      _ <- ().patchEvent
+      c <- P.seqNr
     } yield {
       (a, b, c)
     }
-
-    val expected = (10, 11, 13)
+    val expected = (10, 11, 12)
     patch
-      .narrow[Id, Unit, Unit]
-      .run((), 10) { (_, _, _) => ().pure[Id] }
+      .run((), 10)
       .value shouldEqual expected
   }
 
   test("state") {
-    val expected = Patch.Result("state", SeqNr.Min, List.empty, (), "state")
-    Patch
-      .state[String]
-      .narrow[Id, String, Unit]
-      .run("state", SeqNr.Min) { (s, _, _) => s.pure[Id] } shouldEqual expected.pure[Id]
+    implicit val P = Patch.Maker[Id, String, Unit]
+    P
+      .state
+      .run("state", SeqNr.Min) shouldEqual Patch.Result("state", SeqNr.Min, List.empty, (), "state").pure[Id]
   }
 
   test("event") {
-
-    abstract sealed class E extends Product
-    object E {
-      case object A extends E
-      case object B extends E
-    }
-
+    implicit val P      = Patch.Maker[Id, Int, Int]
+    implicit val change = Patch.Change[Int, Int] { (state, _, event) => (state + event).pure[Id] }
     val patch = for {
-      a <- Patch.state[Int]
-      _ <- Patch.event(E.A)
-      b <- Patch.state[Int]
-      _ <- Patch.event(E.B)
-      c <- Patch.state[Int]
-    } yield (a, b, c)
-    val expected = Patch.Result(2, 2L, List(E.A, E.B), ().pure[Id], (0, 1, 2))
-    patch
-      .monadNarrow[Try]
-      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Try] } shouldEqual expected.pure[Try]
+      a <- P.state
+      _ <- 1.patchEvent
+      b <- P.state
+      _ <- 2.patchEvent
+      c <- P.state
+    } yield {
+      (a, b, c)
+    }
+    patch.run(0, SeqNr.Min) shouldEqual Patch.Result(3, 2L, List(1, 2), ().pure[Id], (0, 1, 3))
   }
 
   test("effect") {
-    Patch
-      .effect(0)
-      .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
+    implicit val P = Patch.Maker[Id, Int, Int]
+    0
+      .patchEffect
+      .run(0, SeqNr.Min)
       .effect shouldEqual 0
   }
 
   test("effect/flatMap") {
-    Patch
-      .effect(0)
-      .flatMap { _ => Patch.unit }
-      .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
+    implicit val P = Patch.Maker[Id, Int, Int]
+    0
+      .patchEffect
+      .flatMap { _ => ().patch }
+      .run(0, SeqNr.Min)
       .effect shouldEqual 0
   }
 
   test("combine effect") {
+    implicit val P = Patch.Maker[Id, Unit, Unit]
     val patch = for {
-      _ <- Patch.effect(0)
-      _ <- Patch.effect(())
-      _ <- Patch.effect("a")
-      _ <- Patch.effect("b")
-      _ <- Patch.effect(())
-    } yield {}
-
+      _ <- 0.patchEffect
+      _ <- ().patchEffect
+      _ <- "a".patchEffect
+      _ <- "b".patchEffect
+      a <- ().patchEffect
+    } yield a
     patch
-      .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
+      .run((), SeqNr.Min)
       .effect shouldEqual (0 -> ("a" -> "b"))
   }
 
   test("combine monadic effect") {
+    implicit val P = Patch.Maker[Id, Unit, Unit]
     val patch = for {
-      _ <- Patch.effect(0.some)
-      _ <- Patch.effect("a".some)
+      _ <- 0.some.patchEffect
+      _ <- "a".some.patchEffect
     } yield {}
-
     patch
-      .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
+      .run((), SeqNr.Min)
       .effect shouldEqual (0, "a").some
   }
 
   test("combine complex effect") {
+    implicit val P = Patch.Maker[Id, Unit, Unit]
     val patch = for {
-      _ <- Patch.effect(0.some).map {  _ => ()}
-      _ <- Patch.effect(())
-      _ <- Patch.effect("a".some).flatMap { _ => Patch.unit }
-      _ <- Patch.effect(().some)
-      _ <- Patch.unit.flatMap { _ => Patch.effect("b".some) }
-      _ <- Patch.effect(().some).unit
-      _ <- Patch.effect(())
+      _ <- 0.some.patchEffect
+      _ <- ().patchEffect
+      _ <- "a".some.patchEffect
+      _ <- ().some.patchEffect
+      _ <- "b".some.patchEffect
+      _ <- ().some.patchEffect
+      _ <- ().patchEffect
     } yield {}
-
     patch
-      .narrow[Id, Int, Int]
-      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
+      .run((), SeqNr.Min)
       .effect shouldEqual (0, ("a", "b")).some
   }
 
   test("combine unit effect") {
-    val patch: Patch[Id, Unit, Unit, Unit, Unit] = for {
-      _ <- Patch.effect(())
-      _ <- Patch.effect(())
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    val patch = for {
+      _ <- ().patchEffect
+      _ <- ().patchEffect
     } yield {}
     val expected = ()
     patch
-      .run(List.empty, SeqNr.Min) { (s, _, _) => s.pure[Id] }
+      .run((), SeqNr.Min)
       .effect shouldEqual expected
   }
 
   test("effect with custom derivation") {
-    val `+`: Derive[Int, Int, Int] = _ + _
-    val `-`: Derive[Int, Int, Int] = _ - _
-    val patch = Patch
-      .effect(0)
+    implicit val P                  = Patch.Maker[Id, Unit, Unit]
+    val `+` : Derive[Int, Int, Int] = _ + _
+    val `-` : Derive[Int, Int, Int] = _ - _
+    val patch = 0
+      .patchEffect
       .flatMap { _ =>
-        Patch
-          .effect(1)
+        1
+          .patchEffect
           .flatMap { _ =>
-            Patch
-              .effect(2)
+            2
+              .patchEffect
               .flatMap { _ =>
-                Patch.effect(3)
-              }(`-`)
-          }(`+`)
-      }(`-`)
+                3.patchEffect
+              }(implicitly, `-`)
+          }(implicitly, `+`)
+      }(implicitly, `-`)
 
     patch
-      .run(0, SeqNr.Min) { (s, _: Int, _) => (s + 1).pure[Id] }
+      .run((), SeqNr.Min)
       .effect shouldEqual 0
   }
 
-  test("effectMap") {
-    Patch
-      .effect(0.pure[Try])
-      .flatMap { _ => Patch.effect("1".pure[Try]) }
-      .effectMap { _.toOption }
-      .narrow[Id, Unit, Unit]
-      .run((), SeqNr.Min) { (_, _, _) => ().pure[Id] }
+  test("effect.map") {
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    0
+      .pure[Try]
+      .patchEffect
+      .flatMap { _ =>
+        "1"
+          .pure[Try]
+          .patchEffect
+      }
+      .effect
+      .map { _.toOption }
+      .run((), SeqNr.Min)
       .effect shouldEqual (0, "1").some
   }
 
+  test("monad.map") {
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    0
+      .patch
+      .monad
+      .map {
+        new FunctionK[Id, Option] {
+          def apply[A](a: Id[A]) = a.some
+        }
+      }
+      .run((), SeqNr.Min)
+      .map { _.state } shouldEqual ().some
+  }
+
+  test("orElse") {
+    implicit val P = Patch.Maker[Either[Unit, *], Int, Int]
+    implicit val change = Patch.Change[Int, Int] { (s, _, e) =>
+      val s1 = s + e
+      if (s1 >= 0) s1.asRight[Unit]
+      else ().asLeft[Int]
+    }
+    (-1)
+      .patchEvent
+      .orElse { 1.patchEvent }
+      .run(0, SeqNr.Min) shouldEqual Patch.Result(1, 1, List(1), (), ()).asRight
+  }
+
   test("change") {
-    val expected = Patch.Result(1, 1L, List("e"), "f".pure[Id], "a")
-    Patch
-      .change[Int] { (s, _) => (s + 1, "e", "f".pure[Id], "a").pure[Id] }
-      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] } shouldEqual expected
+    implicit val P = Patch.Maker[Id, Long, String]
+    P
+      .change { (s, _) => (s + 1, "e", "f", "a").pure[Id] }
+      .run(0, SeqNr.Min) shouldEqual Patch.Result(1, 1L, List("e"), "f", "a")
   }
 
   test("change/flatMap") {
+    implicit val P = Patch.Maker[Id, List[(String, SeqNr)], SeqNr]
+
     def change(a: String) = {
-      Patch.change[List[(String, SeqNr)]] { (s, seqNr) =>
+      P.change { (s, seqNr) =>
         ((a, seqNr) :: s, seqNr, seqNr.pure[Id], seqNr).pure[Id]
       }
     }
+
     val patch = for {
       _ <- for {
         _ <- change("a")
@@ -377,39 +366,59 @@ class PatchTest extends AnyFunSuite with Matchers {
       _ <- change("c")
     } yield {}
 
-    val expected = Patch.Result(
-      state = List(("c", 2), ("b", 1), ("a", 0)),
-      seqNr = 3L,
-      events = List(0, 1, 2),
-      effect = ((0, 1), 2),
-      value = ())
     patch
-      .run(List.empty, SeqNr.Min) { (s, seqNr, _) => (("x", seqNr) :: s).pure[Id] } shouldEqual expected
+      .run(List.empty, SeqNr.Min) shouldEqual Patch
+      .Result
+      .apply(
+        state  = List(("c", 2), ("b", 1), ("a", 0)),
+        seqNr  = 3L,
+        events = List(0, 1, 2),
+        effect = ((0, 1), 2),
+        value  = ()
+      )
   }
 
-  test("default") {
-    val expected = Patch.Result(1, 1L, List("e"), "f".pure[Id], "a")
-    Patch
-      .apply[Int] { (s, _) => ((s + 1, "e").some, "f".pure[Id], "a").pure[Id] }
-      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] } shouldEqual expected
+  test("apply") {
+    implicit val P = Patch.Maker[Id, Long, String]
+    P
+      .apply { (s, _) => ((s + 1, "e").some, "f".pure[Id], "a").pure[Id] }
+      .run(0, SeqNr.Min) shouldEqual Patch.Result(1, 1L, List("e"), "f".pure[Id], "a")
   }
 
-  test("stack safe") {
-    val patch = Patch.unit.narrow[Id, Int, Int]
+  test("flatMap stacksafe") {
+    implicit val P      = Patch.Maker[Id, Unit, Unit]
+    implicit val change = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[Id] }
+    val patch = for {
+      _ <- P.state
+      _ <- P.event(())
+    } yield 1
+    val count = 10000
     List
-      .fill(10000) { patch }
+      .fill(count) { patch }
+      .foldLeft(0.patch) {
+        case (a, b) =>
+          for {
+            a <- a
+            b <- b
+          } yield {
+            a + b
+          }
+      }
+      .run((), SeqNr.Min) shouldEqual Patch.Result((), count.toLong, List.fill(count) { () }, (), count)
+  }
+
+  test("tailRecM stacksafe") {
+    implicit val P      = Patch.Maker[IO, Unit, Unit]
+    implicit val change = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[IO] }
+    val patch = for {
+      _ <- P.state
+      _ <- P.event(())
+    } yield 1
+    val count = 10000
+    List
+      .fill(count) { patch }
       .foldA
-      .run(0, SeqNr.Min) { (s, _, _) => (s + 1).pure[Id] }
-      .state shouldEqual 0
-  }
-
-  test("stack safe effect") {
-    val patch = Patch.effect(1).narrow[Id, Int, Int]
-    val derive: Derive[Int, Int, Int] = (a, b) => a + b
-    List
-      .fill(10000) { patch }
-      .reduceLeft { (a, b) => a.flatMap { _ => b }(derive) }
-      .run(0, SeqNr.Min) { (s, _, _) => s.pure[Id] }
-      .effect shouldEqual 10000
+      .run((), SeqNr.Min)
+      .unsafeRunSync() shouldEqual Patch.Result((), count.toLong, List.fill(count) { () }, (), count)
   }
 }

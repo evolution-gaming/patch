@@ -9,43 +9,51 @@
 Here is a short example of how this works
 
 ```scala
-  final case class Event(value: Int)
-  
-  final case class State(value: Int)
-  
-  def enabled: IO[Boolean] = ???
-  
-  def log(msg: String): IO[Unit] = ???
-  
-  val patch: Patch[IO, State, Event, IO[Unit], Either[String, State]] = for {
-    enabled <- Patch.lift { enabled } // you might need to execute effect in order to decide on how to proceed
-    result  <- if (enabled) {
-      for {
-        before <- Patch.state[State]
-        _      <- Patch.event(Event(+1)) // event to be appended
-        after  <- Patch.state[State] // state after event is applied
-        seqNr  <- Patch.seqNr // seqNr at this point
-        _      <- Patch.effect { log(s"state changed from $before to $after($seqNr)") } // side effect to be executed 
-      } yield {
-        after.asRight[String]
-      }
-    } else {
-      // you might not produce any events and just have side effect
-      Patch
-        .effect { log("state remains the same") }
-        .as("disabled".asLeft[State])
-    }
-  } yield result
-  
-  // now we can run our `Patch` by passing initial state, seqNr and `replay` function `(state, event) => state`   
-  val result = patch.run(State(0), SeqNr.Min) { (state, event, seqNr) =>
-    state
-      .copy(value = state.value + event.value)
-      .pure[IO]
-  }
+    final case class Event(value: Int)
 
-  // here we have resulting state, list of all events, composition of side effects to be executed in case events are successfully persisted
-  result // IO(Patch.Result(State(1), List(Event(1)), IO.unit, State(1).asRight))
+    final case class State(value: Int)
+
+    // we need this to make compiler happy
+    implicit val maker = Patch.Maker[IO, State, Event]
+
+    // how to apply newly issued event to state
+    implicit val change = Patch.Change[State, Event] { (state, seqNr, event) =>
+      state
+        .copy(value = state.value + event.value)
+        .pure[IO]
+    }
+    
+    import com.evolution.patch.Patch.implicits._ // adds nice syntax
+    
+    def enabled: IO[Boolean] = IO.pure(true)
+    
+    def log(msg: String): IO[Unit] = IO.unit
+    
+    val patch: Patch[IO, State, Event, IO[Unit], Either[String, State]] = for {
+      enabled <- enabled.patchLift // you might need to execute effect in order to decide on how to proceed
+      result  <- if (enabled) {
+        for {
+          before <- Patch.state
+          _      <- Event(+1).patchEvent // event to be appended
+          after  <- Patch.state // state after event is applied
+          seqNr  <- Patch.seqNr // seqNr at this point
+          _      <- log(s"state changed from $before to $after($seqNr)").patchEffect
+        } yield {
+          after.asRight[String]
+        }
+      } else {
+        // you might not produce any events and just have side effect
+        log("state remains the same")
+          .patchEffect
+          .as("disabled".asLeft[State])
+      }
+    } yield result
+    
+    // now we can run our `Patch` by passing initial `state` and `seqNr`
+    val result = patch.run(State(0), SeqNr.Min)
+
+    // here we have resulting state, list of all events, composition of side effects to be executed in case events are successfully persisted
+    result // IO(Patch.Result(State(1), List(Event(1)), IO.unit, State(1).asRight))
 ```
 
 ## Setup
@@ -54,5 +62,5 @@ in [`build.sbt`](https://www.scala-sbt.org/1.x/docs/Basic-Def.html#What+is+a+bui
 ```scala
 addSbtPlugin("com.evolution" % "sbt-artifactory-plugin" % "0.0.2")
 
-libraryDependencies += "com.evolution" %% "patch" % "0.0.5"
+libraryDependencies += "com.evolution" %% "patch" % "0.1.0"
 ```

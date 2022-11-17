@@ -12,9 +12,11 @@ class PatchLawTest extends AnyFunSuite with FunSuiteDiscipline with Configuratio
 
   type Patch[A] = com.evolution.patch.Patch[Id, Unit, Unit, Unit, A]
 
+  private implicit val maker = Patch.Maker[Id, Unit, Unit]
+
   implicit def eqPatch[A: Eq]: Eq[Patch[A]] = (x: Patch[A], y: Patch[A]) => {
 
-    def run(patch: Patch[A]) = patch.run((), SeqNr.Min) { (_, _, _) => () }
+    def run(patch: Patch[A]) = patch.run((), SeqNr.Min)
 
     run(x) === run(y)
   }

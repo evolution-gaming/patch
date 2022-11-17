@@ -1,6 +1,7 @@
 package com.evolution.patch
 
 import cats.Apply
+import cats.kernel.Monoid
 import cats.syntax.all._
 
 trait Derive[A, B, C] {
@@ -12,6 +13,9 @@ object Derive extends DeriveImplicits0 {
 
   def apply[A, B, C](implicit derive: Derive[A, B, C]): Derive[A, B, C] = derive
 
+  def fromMonoid[A: Monoid]: Derive[A, A, A] = new Derive[A, A, A] {
+    def apply(a: A, b: A) = Monoid[A].combine(a, b)
+  }
 
   implicit def productRightDerive[F[_]: Apply, A]: Derive[F[Unit], F[A], F[A]] = new Derive[F[Unit], F[A], F[A]] {
 

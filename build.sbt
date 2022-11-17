@@ -24,7 +24,6 @@ scalacOptsFailOnWarn := Some(false)
 
 libraryDependencies ++= Seq(
   Cats.core,
-  Cats.alleycats,
   Cats.effect % Test,
   Cats.laws % Test,
   scalatest % Test,
