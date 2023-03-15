@@ -3,7 +3,8 @@ package com.evolution.patch
 import cats.Id
 import cats.arrow.FunctionK
 import cats.effect.IO
-import cats.effect.concurrent.Ref
+import cats.effect.Ref
+import cats.effect.unsafe.implicits.global
 import cats.syntax.all._
 import com.evolution.patch.Patch.implicits._
 import org.scalatest.funsuite.AnyFunSuite

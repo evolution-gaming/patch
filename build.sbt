@@ -14,7 +14,7 @@ organizationHomepage := Some(url("http://evolution.com"))
 
 scalaVersion := crossScalaVersions.value.head
 
-crossScalaVersions := Seq("2.13.3", "2.12.12")
+crossScalaVersions := Seq("2.13.10", "2.12.17")
 
 publishTo := Some(Resolver.evolutionReleases)
 
@@ -24,9 +24,9 @@ scalacOptsFailOnWarn := Some(false)
 
 libraryDependencies ++= Seq(
   Cats.core,
-  Cats.effect % Test,
-  Cats.laws % Test,
-  scalatest % Test,
+  Cats.laws              % Test,
+  `cats-effect`          % Test,
+  scalatest              % Test,
   `scalacheck-shapeless` % Test,
   `discipline-scalatest` % Test,
 )

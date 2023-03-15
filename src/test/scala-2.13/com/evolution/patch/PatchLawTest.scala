@@ -1,5 +1,6 @@
 package com.evolution.patch
 
+import com.evolution.patch.Patch.implicits._
 import cats.kernel.laws.discipline.MonoidTests
 import cats.laws.discipline.MonadTests
 import cats.{Eq, Id}
@@ -14,7 +15,7 @@ class PatchLawTest extends AnyFunSuite with FunSuiteDiscipline with Configuratio
 
   private implicit val maker = Patch.Maker[Id, Unit, Unit]
 
-  implicit def eqPatch[A: Eq]: Eq[Patch[A]] = (x: Patch[A], y: Patch[A]) => {
+  implicit def eqPatch[A]: Eq[Patch[A]] = (x: Patch[A], y: Patch[A]) => {
 
     def run(patch: Patch[A]) = patch.run((), SeqNr.Min)
 
@@ -25,7 +26,7 @@ class PatchLawTest extends AnyFunSuite with FunSuiteDiscipline with Configuratio
     Arbitrary {
       Arbitrary
         .arbitrary[A]
-        .map { a => Patch.pure(a) }
+        .map { _.patch }
     }
   }
 
