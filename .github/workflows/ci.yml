@@ -14,14 +14,16 @@ jobs:
           - 2.12.12
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: coursier/cache-action@v5
+      - uses: coursier/cache-action@v6
 
-      - name: scala
-        uses: olafurpg/setup-scala@v10
+      - name: Setup Java
+        uses: actions/setup-java@v3
         with:
-          java-version: openjdk@1.11
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'sbt'
 
       - name: build ${{ matrix.scala }}
         run: sbt ++${{ matrix.scala }} clean coverage test
