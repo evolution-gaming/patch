@@ -441,4 +441,46 @@ class PatchTest extends AnyFunSuite with Matchers {
       .flatten1
       .run((), SeqNr.Min) shouldEqual Patch.Result((), SeqNr.Min, List.empty, ().some, ())
   }
+
+  test("optional") {
+    implicit val P = Patch.Maker[Either[String, *], Unit, Unit]
+    val patch = for {
+      a <- "ok"
+        .asRight[String]
+        .patchLift
+        .optional
+      b <- "ko"
+        .asLeft[Unit]
+        .patchLift
+        .optional
+    } yield {
+      (a, b)
+    }
+
+    patch
+      .run((), SeqNr.Min) shouldEqual Patch.Result
+      .apply((), SeqNr.Min, List.empty, (), ("ok".some, none))
+      .asRight
+  }
+
+  test("attempt") {
+    implicit val P = Patch.Maker[Either[String, *], Unit, Unit]
+    val patch = for {
+      a <- "ok"
+        .asRight[String]
+        .patchLift
+        .attempt
+      b <- "ko"
+        .asLeft[Unit]
+        .patchLift
+        .attempt
+    } yield {
+      (a, b)
+    }
+
+    patch
+      .run((), SeqNr.Min) shouldEqual Patch.Result
+      .apply((), SeqNr.Min, List.empty, (), ("ok".asRight, "ko".asLeft))
+      .asRight
+  }
 }

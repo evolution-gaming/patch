@@ -156,14 +156,14 @@ object Patch extends PatchInstances2 {
     }
   }
 
-  implicit class PatchUnitOps[M[_], S, E, F](val self: Patch[M, S, E, F, Unit]) extends AnyVal {
+  implicit class PatchOps[M[_], S, E, F, A](val self: Patch[M, S, E, F, A]) extends AnyVal {
 
-    // TODO we can return Option[A]
-    def optional[Er](implicit M: MonadError[M, Er], monoid: Monoid[F]): Patch[M, S, E, F, Unit] = {
+    def optional[Er](implicit M: MonadError[M, Er], monoid: Monoid[F]): Patch[M, S, E, F, Option[A]] = {
       of { in =>
         self
           .io(in)
-          .handleError { _ => in.out(Monoid[F].empty, ()) }
+          .map { out => out.copy(a = out.a.some) }
+          .handleError { _ => in.out(Monoid[F].empty, none[A]) }
       }
     }
   }
@@ -529,6 +529,25 @@ sealed abstract private[patch] class PatchInstances2 extends PatchInstances1 {
           fa
             .io(in)
             .handleErrorWith { a => f(a).io(in) }
+        }
+      }
+
+      override def handleError[A](fa: Patch[M, S, E, F, A])(f: Er => A) = {
+        of[S, E] { in =>
+          fa
+            .io(in)
+            .handleError { a =>
+              in.out(Monoid[F].empty, f(a))
+            }
+        }
+      }
+
+      override def attempt[A](fa: Patch[M, S, E, F, A]): Patch[M, S, E, F, Either[Er, A]] = {
+        of[S, E] { in =>
+          fa
+            .io(in)
+            .map { out => out.copy(a = out.a.asRight[Er]) }
+            .handleError { a => in.out(Monoid[F].empty, a.asLeft[A]) }
         }
       }
     }
