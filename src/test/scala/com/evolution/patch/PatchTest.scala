@@ -422,4 +422,23 @@ class PatchTest extends AnyFunSuite with Matchers {
       .run((), SeqNr.Min)
       .unsafeRunSync() shouldEqual Patch.Result((), count.toLong, List.fill(count) { () }, (), count)
   }
+
+  test("flatten") {
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    ()
+      .patch
+      .patch
+      .flatten
+      .run((), SeqNr.Min) shouldEqual Patch.Result((), SeqNr.Min, List.empty, (), ())
+  }
+
+  test("flatten1") {
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    ()
+      .some
+      .patchEffect
+      .patch
+      .flatten1
+      .run((), SeqNr.Min) shouldEqual Patch.Result((), SeqNr.Min, List.empty, ().some, ())
+  }
 }

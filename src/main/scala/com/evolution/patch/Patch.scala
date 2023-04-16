@@ -158,12 +158,20 @@ object Patch extends PatchInstances2 {
 
   implicit class PatchUnitOps[M[_], S, E, F](val self: Patch[M, S, E, F, Unit]) extends AnyVal {
 
+    // TODO we can return Option[A]
     def optional[Er](implicit M: MonadError[M, Er], monoid: Monoid[F]): Patch[M, S, E, F, Unit] = {
       of { in =>
         self
           .io(in)
           .handleError { _ => in.out(Monoid[F].empty, ()) }
       }
+    }
+  }
+
+  implicit class PatchPatchOps[M[_], S, E, F, F1, A](val self: Patch[M, S, E, F, Patch[M, S, E, F1, A]]) extends AnyVal {
+
+    def flatten1[F2](implicit M: FlatMap[M], derive: Derive[F, F1, F2]): Patch[M, S, E, F2, A] = {
+      self.flatMap(identity)
     }
   }
 
