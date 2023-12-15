@@ -6,6 +6,20 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellowgreen.svg)](https://opensource.org/licenses/MIT)
 
 `Patch` is a monadic data structure - a building block for [event-sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) application
+
+It is a specialized version of [IndexedReaderWriterStateT](https://github.com/typelevel/cats/blob/main/core/src/main/scala/cats/data/IndexedReaderWriterStateT.scala#L34)
+
+In case you come here and have no clue of what the wierd word above means, you can start your learning journey in the following order:
+1. [cats exercises](https://www.scala-exercises.org/cats)
+2. [Reader](https://eed3si9n.com/learning-scalaz/Reader.html)
+3. [Writer](https://typelevel.org/cats/datatypes/writer.html)
+4. [State](https://typelevel.org/cats/datatypes/state.html)
+5. [Monad Transformer](https://eed3si9n.com/learning-scalaz/Monad+transformers.html#:~:text=A%20monad%20transformer%20is%20similar,behaviour%20of%20an%20underlying%20monad.)
+6. [WriterT](https://typelevel.org/cats/datatypes/writert.html)
+7. [StateT](https://typelevel.org/cats/datatypes/statet.html)
+8. If you have gone so far by now and do understand basic principles of event sourcing, you should have no questions about `Patch` :)
+
+
 Here is a short example of how this works
 
 ```scala
