@@ -20,7 +20,7 @@ the user-friendly API and storage implementations, and, therefore, make the task
 The problem is that, however, as you are building the larger application, you realize quickly that these frameworks have
 a single important flaw: neither [EventSourcedBehavior](https://doc.akka.io/api/akka/2.8/akka/persistence/typed/scaladsl/EventSourcedBehavior.html),
 nor [PersistentActor](https://doc.akka.io/api/akka/2.8/akka/persistence/PersistentActor.html) compose, which is a real shame,
-given that Event Sourcing could be really useful for the large and complicated business domains, where hight performance and
+given that Event Sourcing could be really useful for the large and complicated business domains, where high performance and
 availability is also essential.
 
 This small (~500 LOC) library is meant to make an improvement in this area. The developer will, finally, be able to split
