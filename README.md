@@ -7,9 +7,36 @@
 
 `Patch` is a monadic data structure - a building block for [event-sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) application
 
+# Motivation
+
+Event Sourcing is one of the latest advances in software architecture design. It is meant to replace CRUD approach in the areas
+where speed of persisting data, scalability and near real-time reactions are essential. The approach does not come without its own
+flaws though. It is a complicated task to build a well working Event Sourcing based application and in a lot of cases it is
+considered to be an unnecessary overkill.
+
+The modern frameworks such as [Akka Persistence](https://doc.akka.io/docs/akka/current/typed/persistence.html) provide
+the user-friendly API and storage implementations, and, therefore, make the task of building Event Sourced software, easier.
+
+The problem is that, however, as you are building the larger application, you realize quickly that these frameworks have
+a single important flaw: neither [EventSourcedBehavior](https://doc.akka.io/api/akka/2.8/akka/persistence/typed/scaladsl/EventSourcedBehavior.html),
+nor [PersistentActor](https://doc.akka.io/api/akka/2.8/akka/persistence/PersistentActor.html) compose, which is a real shame,
+given that Event Sourcing could be really useful for the large and complicated business domains, where hight performance and
+availability is also essential.
+
+This small (~500 LOC) library is meant to make an improvement in this area. The developer will, finally, be able to split
+the events sourcing code into smaller pieces, write unit tests for each interesting piece, and then compose the parts into
+a larger application, all in a type safe and consistent way.
+
+# Maturity
+
+The code is proven to be stable and, currently, powering the whole set of mission critical applications. Saying that, the
+library itself is provided on AS IS basis, without any promises or guarantees.
+
+# Implementation
+
 It is a specialized version of [IndexedReaderWriterStateT](https://github.com/typelevel/cats/blob/main/core/src/main/scala/cats/data/IndexedReaderWriterStateT.scala#L34)
 
-In case you come here and have no clue of what the wierd word above means, you can start your learning journey in the following order:
+In case you come here and have no clue of what the weird word above means, you can start your learning journey in the following order:
 1. [cats exercises](https://www.scala-exercises.org/cats)
 2. [Reader](https://eed3si9n.com/learning-scalaz/Reader.html)
 3. [Writer](https://typelevel.org/cats/datatypes/writer.html)
@@ -19,6 +46,7 @@ In case you come here and have no clue of what the wierd word above means, you c
 7. [StateT](https://typelevel.org/cats/datatypes/statet.html)
 8. If you have gone so far by now and do understand basic principles of event sourcing, you should have no questions about `Patch` :)
 
+# Example
 
 Here is a short example of how this works
 
@@ -36,13 +64,13 @@ Here is a short example of how this works
         .copy(value = state.value + event.value)
         .pure[IO]
     }
-    
+
     import com.evolution.patch.Patch.implicits._ // adds nice syntax
-    
+
     def enabled: IO[Boolean] = IO.pure(true)
-    
+
     def log(msg: String): IO[Unit] = IO.unit
-    
+
     val patch: Patch[IO, State, Event, IO[Unit], Either[String, State]] = for {
       enabled <- enabled.patchLift // you might need to execute effect in order to decide on how to proceed
       result  <- if (enabled) {
@@ -62,7 +90,7 @@ Here is a short example of how this works
           .as("disabled".asLeft[State])
       }
     } yield result
-    
+
     // now we can run our `Patch` by passing initial `state` and `seqNr`
     val result = patch.run(State(0), SeqNr.Min)
 
