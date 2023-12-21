@@ -4,15 +4,28 @@ import cats.data.{AndThen, EitherT}
 import cats.syntax.all._
 import cats.{Applicative, FlatMap, Functor, Monad, MonadError, Monoid, StackSafeMonad, ~>}
 
-/**
-  * This monadic data structure helps to describe changes to state as events
-  * and combine them together as well as relevant effects
+/** This monadic data structure helps to describe changes to state as events and
+  * combine them together as well as relevant effects
   *
-  * @tparam M monad
-  * @tparam S state
-  * @tparam E event
-  * @tparam F effect
-  * @tparam A result
+  * @tparam M
+  *   A *monad* to be used to capture the effectful computation when doing a
+  *   patch such as [[cats.effect.IO]]. The common use case is to use it to
+  *   raise an error found if validation or other effectful process failed.
+  * @tparam S
+  *   A *state* to update when calling [[Patch#event]], or retain when calling
+  *   other methods.
+  * @tparam E
+  *   A type of *events* to accumulate when calling [[Patch#event]] method) or
+  *   retain when calling othouter methods.
+  * @tparam F
+  *   A type of *effects* to be executed after the produced events are confirmed
+  *   to be persisted. When doing [[Patch#flatMap]] the effects will be
+  *   accumulate into a single value using provided `Monoid[F]` instance. I.e.
+  *   if `F = IO[Unit]` then `fa`, `fb` and `fc` will accumulate to `fa *> fb *>
+  *   fc`. Note that `F` does not have to be anyhow related to `M[_]`.
+  * @tparam A
+  *   A *result* of the function. Also used as an argument in [[Patch#map]] and
+  *   [[Patch#flatMap]].
   */
 sealed abstract case class Patch[M[_], S, E, F, A] private (
   io: Patch.In[S, E] => M[Patch.Out[S, E, F, A]]
