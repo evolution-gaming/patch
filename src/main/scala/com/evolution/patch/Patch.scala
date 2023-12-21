@@ -9,7 +9,8 @@ import cats.{Applicative, FlatMap, Functor, Monad, MonadError, Monoid, StackSafe
   *
   * @tparam M
   *   A *monad* to be used to capture the effectful computation when doing a
-  *   patch such as [[cats.effect.IO]].
+  *   patch such as [[cats.effect.IO]]. The common use case is to use it to
+  *   raise an error found if validation or other effectful process failed.
   * @tparam S
   *   A *state* to update when calling [[Patch#event]], or retain when calling
   *   other methods.
