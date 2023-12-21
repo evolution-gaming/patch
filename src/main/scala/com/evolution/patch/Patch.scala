@@ -15,11 +15,11 @@ import cats.{Applicative, FlatMap, Functor, Monad, MonadError, Monoid, StackSafe
   *   A *state* to update when calling [[Patch#event]], or retain when calling
   *   other methods.
   * @tparam E
-  *   A type of *events* to accumulate when calling [[Patch#event]] method) or
-  *   retain when calling othouter methods.
+  *   A type of *events* to accumulate when calling [[Patch#event]] method or
+  *   retain when calling other methods.
   * @tparam F
   *   A type of *effects* to be executed after the produced events are confirmed
-  *   to be persisted. When doing [[Patch#flatMap]] the effects will be
+  *   to be persisted. When doing [[Patch#flatMap]] the effects will
   *   accumulate into a single value using provided `Monoid[F]` instance. I.e.
   *   if `F = IO[Unit]` then `fa`, `fb` and `fc` will accumulate to `fa *> fb *>
   *   fc`. Note that `F` does not have to be anyhow related to `M[_]`.
