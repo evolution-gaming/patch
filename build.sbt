@@ -4,13 +4,13 @@ name := "patch"
 
 organization := "com.evolution"
 
-homepage := Some(new URL("http://github.com/evolution-gaming/patch"))
+homepage := Some(url("https://github.com/evolution-gaming/patch"))
 
 startYear := Some(2020)
 
 organizationName := "Evolution"
 
-organizationHomepage := Some(url("http://evolution.com"))
+organizationHomepage := Some(url("https://evolution.com"))
 
 scalaVersion := crossScalaVersions.value.head
 
@@ -36,3 +36,7 @@ licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
 releaseCrossBuild := true
 
 versionScheme := Some("early-semver")
+
+//addCommandAlias("check", "all versionPolicyCheck Compile/doc")
+addCommandAlias("check", "show version")
+addCommandAlias("build", "+all compile test")
