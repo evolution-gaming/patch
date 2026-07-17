@@ -16,12 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup Java
-        uses: actions/setup-java@v3
+      - uses: coursier/cache-action@v6
+
+      - name: scala
+        uses: olafurpg/setup-scala@v11
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'sbt'
+          java-version: 17
 
       - name: build ${{ matrix.scala }}
         run: sbt ++${{ matrix.scala }} clean coverage test
