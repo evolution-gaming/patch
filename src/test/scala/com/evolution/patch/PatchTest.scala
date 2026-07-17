@@ -16,7 +16,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
   test("all") {
     implicit val P      = Patch.Maker[Id, Int, String]
-    implicit val change = Patch.Change[Int, String] { (state, _, _) => (state + 1).pure[Id] }
+    implicit val change: Patch.Change[Id, Int, String] = Patch.Change[Int, String] { (state, _, _) => (state + 1).pure[Id] }
     val patch = for {
       _ <- ().patch[Id, Int, String]
       a <- P.lift { "a".pure[Id] }
@@ -35,7 +35,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
   test("all complex") {
     implicit val P      = Patch.Maker[Id, SeqNr, String]
-    implicit val change = Patch.Change[SeqNr, String] { (s, _, _) => (s + 1).pure[Id] }
+    implicit val change: Patch.Change[Id, SeqNr, String] = Patch.Change[SeqNr, String] { (s, _, _) => (s + 1).pure[Id] }
 
     def lift[A](a: A) = {
       for {
@@ -169,7 +169,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
   test("seqNr") {
     implicit val P      = Patch.Maker[Id, Unit, Unit]
-    implicit val change = Patch.Change.const[Unit](().pure[Id])
+    implicit val change: Patch.Change[Id, Unit, Unit] = Patch.Change.const[Unit](().pure[Id])
     val patch = for {
       a <- P.seqNr
       _ <- ().patchEvent
@@ -194,7 +194,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
   test("event") {
     implicit val P      = Patch.Maker[Id, Int, Int]
-    implicit val change = Patch.Change[Int, Int] { (state, _, event) => (state + event).pure[Id] }
+    implicit val change: Patch.Change[Id, Int, Int] = Patch.Change[Int, Int] { (state, _, event) => (state + event).pure[Id] }
     val patch = for {
       a <- P.state
       _ <- 1.patchEvent
@@ -332,7 +332,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
   test("orElse") {
     implicit val P = Patch.Maker[Either[Unit, *], Int, Int]
-    implicit val change = Patch.Change[Int, Int] { (s, _, e) =>
+    implicit val change: Patch.Change[Either[Unit, *], Int, Int] = Patch.Change[Int, Int] { (s, _, e) =>
       val s1 = s + e
       if (s1 >= 0) s1.asRight[Unit]
       else ().asLeft[Int]
@@ -388,7 +388,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
   test("flatMap stacksafe") {
     implicit val P      = Patch.Maker[Id, Unit, Unit]
-    implicit val change = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[Id] }
+    implicit val change: Patch.Change[Id, Unit, Unit] = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[Id] }
     val patch = for {
       _ <- P.state
       _ <- P.event(())
@@ -410,7 +410,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
   test("tailRecM stacksafe") {
     implicit val P      = Patch.Maker[IO, Unit, Unit]
-    implicit val change = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[IO] }
+    implicit val change: Patch.Change[IO, Unit, Unit] = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[IO] }
     val patch = for {
       _ <- P.state
       _ <- P.event(())

@@ -438,7 +438,7 @@ sealed abstract private[patch] class PatchInstances1 {
   import Patch._
 
   implicit def monadPatch[M[_]: Monad, S, E, F: Monoid]: Monad[Patch[M, S, E, F, *]] = {
-    implicit val derive = Derive.fromMonoid[F]
+    implicit val derive: Derive[F, F, F] = Derive.fromMonoid[F]
     new Monad[Patch[M, S, E, F, *]] {
 
       def pure[A](a: A) = {
@@ -513,7 +513,7 @@ sealed abstract private[patch] class PatchInstances2 extends PatchInstances1 {
   implicit def monadErrorPatch[M[_], Er, S, E, F: Monoid](
     implicit M: MonadError[M, Er]
   ): MonadError[Patch[M, S, E, F, *], Er] = {
-    implicit val derive = Derive.fromMonoid[F]
+    implicit val derive: Derive[F, F, F] = Derive.fromMonoid[F]
     new MonadError[Patch[M, S, E, F, *], Er] with StackSafeMonad[Patch[M, S, E, F, *]] {
 
       def pure[A](a: A) = {
@@ -541,7 +541,7 @@ sealed abstract private[patch] class PatchInstances2 extends PatchInstances1 {
         of[S, E] { in =>
           fa
             .io(in)
-            .handleErrorWith { a => f(a).io(in) }
+            .handleErrorWith { (a: Er) => f(a).io(in) }
         }
       }
 
@@ -549,7 +549,7 @@ sealed abstract private[patch] class PatchInstances2 extends PatchInstances1 {
         of[S, E] { in =>
           fa
             .io(in)
-            .handleError { a =>
+            .handleError { (a: Er) =>
               in.out(Monoid[F].empty, f(a))
             }
         }
@@ -560,7 +560,7 @@ sealed abstract private[patch] class PatchInstances2 extends PatchInstances1 {
           fa
             .io(in)
             .map { out => out.copy(a = out.a.asRight[Er]) }
-            .handleError { a => in.out(Monoid[F].empty, a.asLeft[A]) }
+            .handleError { (a: Er) => in.out(Monoid[F].empty, a.asLeft[A]) }
         }
       }
     }

@@ -13,7 +13,7 @@ class PatchLawTest extends AnyFunSuite with FunSuiteDiscipline with Configuratio
 
   type Patch[A] = com.evolution.patch.Patch[Id, Unit, Unit, Unit, A]
 
-  private implicit val maker = Patch.Maker[Id, Unit, Unit]
+  private implicit val maker: Patch.Maker[Id, Unit, Unit] = Patch.Maker[Id, Unit, Unit]
 
   implicit def eqPatch[A]: Eq[Patch[A]] = (x: Patch[A], y: Patch[A]) => {
 

@@ -18,7 +18,7 @@ class ExampleTest extends AnyFunSuite with Matchers {
     implicit val maker = Patch.Maker[IO, State, Event]
 
     // how to apply newly issued event to state
-    implicit val change = Patch.Change[State, Event] { (state, seqNr, event) =>
+    implicit val change: Patch.Change[IO, State, Event] = Patch.Change[State, Event] { (state, seqNr, event) =>
       state
         .copy(value = state.value + event.value)
         .pure[IO]
