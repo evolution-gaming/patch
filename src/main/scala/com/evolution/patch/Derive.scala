@@ -11,7 +11,10 @@ trait Derive[A, B, C] {
 
 object Derive extends DeriveImplicits0 {
 
-  def apply[A, B, C](implicit derive: Derive[A, B, C]): Derive[A, B, C] = derive
+  def apply[A, B, C](
+    implicit
+    derive: Derive[A, B, C],
+  ): Derive[A, B, C] = derive
 
   def fromMonoid[A: Monoid]: Derive[A, A, A] = new Derive[A, A, A] {
     def apply(a: A, b: A) = Monoid[A].combine(a, b)
@@ -24,7 +27,6 @@ object Derive extends DeriveImplicits0 {
     override def toString = "Derive.productRight"
   }
 
-
   implicit def rightDerive[A]: Derive[Unit, A, A] = new Derive[Unit, A, A] {
 
     def apply(a: Unit, b: A) = b
@@ -32,11 +34,14 @@ object Derive extends DeriveImplicits0 {
     override def toString = "Derive.right"
   }
 
-
   object implicits {
 
     implicit class IdOpsDerive[A](val self: A) extends AnyVal {
-      def derive[B, C](b: B)(implicit derive: Derive[A, B, C]): C = derive(self, b)
+      def derive[B, C](
+        b: B,
+      )(implicit
+        derive: Derive[A, B, C],
+      ): C = derive(self, b)
     }
   }
 }
@@ -49,7 +54,6 @@ sealed abstract class DeriveImplicits0 extends DeriveImplicits1 {
 
     override def toString = "Derive.left"
   }
-
 
   implicit def productLeftDerive[F[_]: Apply, A]: Derive[F[A], F[Unit], F[A]] = new Derive[F[A], F[Unit], F[A]] {
 

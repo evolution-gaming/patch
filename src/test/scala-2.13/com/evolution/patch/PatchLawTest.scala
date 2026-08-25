@@ -1,9 +1,9 @@
 package com.evolution.patch
 
-import com.evolution.patch.Patch.implicits._
 import cats.kernel.laws.discipline.MonoidTests
 import cats.laws.discipline.MonadTests
 import cats.{Eq, Id}
+import com.evolution.patch.Patch.implicits._
 import org.scalacheck.Arbitrary
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.prop.Configuration
@@ -13,7 +13,7 @@ class PatchLawTest extends AnyFunSuite with FunSuiteDiscipline with Configuratio
 
   type Patch[A] = com.evolution.patch.Patch[Id, Unit, Unit, Unit, A]
 
-  private implicit val maker = Patch.Maker[Id, Unit, Unit]
+  private implicit val maker: Patch.Maker[Id, Unit, Unit] = Patch.Maker[Id, Unit, Unit]
 
   implicit def eqPatch[A]: Eq[Patch[A]] = (x: Patch[A], y: Patch[A]) => {
 

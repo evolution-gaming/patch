@@ -4,37 +4,39 @@ import cats.data.{AndThen, EitherT}
 import cats.syntax.all._
 import cats.{Applicative, FlatMap, Functor, Monad, MonadError, Monoid, StackSafeMonad, ~>}
 
-/** This monadic data structure helps to describe changes to state as events and
-  * combine them together as well as relevant effects
-  *
-  * @tparam M
-  *   A *monad* to be used to capture the effectful computation when doing a
-  *   patch such as [[cats.effect.IO]]. The common use case is to use it to
-  *   raise an error found if validation or other effectful process failed.
-  * @tparam S
-  *   A *state* to update when calling [[Patch#event]], or retain when calling
-  *   other methods.
-  * @tparam E
-  *   A type of *events* to accumulate when calling [[Patch#event]] method or
-  *   retain when calling other methods.
-  * @tparam F
-  *   A type of *effects* to be executed after the produced events are confirmed
-  *   to be persisted. When doing [[Patch#flatMap]] the effects will
-  *   accumulate into a single value using provided `Monoid[F]` instance. I.e.
-  *   if `F = IO[Unit]` then `fa`, `fb` and `fc` will accumulate to `fa *> fb *>
-  *   fc`. Note that `F` does not have to be anyhow related to `M[_]`.
-  * @tparam A
-  *   A *result* of the function. Also used as an argument in [[Patch#map]] and
-  *   [[Patch#flatMap]].
-  */
+/**
+ * This monadic data structure helps to describe changes to state as events and combine them
+ * together as well as relevant effects
+ *
+ * @tparam M
+ *   A *monad* to be used to capture the effectful computation when doing a patch such as
+ *   [[cats.effect.IO]]. The common use case is to use it to raise an error found if validation or
+ *   other effectful process failed.
+ * @tparam S
+ *   A *state* to update when calling [[Patch#event]], or retain when calling other methods.
+ * @tparam E
+ *   A type of *events* to accumulate when calling [[Patch#event]] method or retain when calling
+ *   other methods.
+ * @tparam F
+ *   A type of *effects* to be executed after the produced events are confirmed to be persisted.
+ *   When doing [[Patch#flatMap]] the effects will accumulate into a single value using provided
+ *   `Monoid[F]` instance. I.e. if `F = IO[Unit]` then `fa`, `fb` and `fc` will accumulate to `fa *>
+ *   fb *> fc`. Note that `F` does not have to be anyhow related to `M[_]`.
+ * @tparam A
+ *   A *result* of the function. Also used as an argument in [[Patch#map]] and [[Patch#flatMap]].
+ */
 sealed abstract case class Patch[M[_], S, E, F, A] private (
-  io: Patch.In[S, E] => M[Patch.Out[S, E, F, A]]
+  io: Patch.In[S, E] => M[Patch.Out[S, E, F, A]],
 ) {
   self =>
 
   import Patch._
 
-  def map[B](f: A => B)(implicit M: Functor[M]): Patch[M, S, E, F, B] = {
+  def map[B](
+    f: A => B,
+  )(implicit
+    M: Functor[M],
+  ): Patch[M, S, E, F, B] = {
     of {
       AndThen
         .apply(io)
@@ -45,8 +47,11 @@ sealed abstract case class Patch[M[_], S, E, F, A] private (
   }
 
   def flatMap[F1, F2, B](
-    f: A => Patch[M, S, E, F1, B]
-  )(implicit M: FlatMap[M], derive: Derive[F, F1, F2]): Patch[M, S, E, F2, B] = {
+    f: A => Patch[M, S, E, F1, B],
+  )(implicit
+    M: FlatMap[M],
+    derive: Derive[F, F1, F2],
+  ): Patch[M, S, E, F2, B] = {
     of {
       AndThen
         .apply(io)
@@ -62,9 +67,16 @@ sealed abstract case class Patch[M[_], S, E, F, A] private (
     }
   }
 
-  def as[B](value: B)(implicit M: Functor[M]): Patch[M, S, E, F, B] = map { _ => value }
+  def as[B](
+    value: B,
+  )(implicit
+    M: Functor[M],
+  ): Patch[M, S, E, F, B] = map { _ => value }
 
-  def unit(implicit M: Functor[M]): Patch[M, S, E, F, Unit] = as(())
+  def unit(
+    implicit
+    M: Functor[M],
+  ): Patch[M, S, E, F, Unit] = as(())
 
   def monad: MonadProjection[M, S, E, F, A] = new MonadProjection(self)
 
@@ -74,7 +86,12 @@ sealed abstract case class Patch[M[_], S, E, F, A] private (
 
   def effect: EffectProjection[M, S, E, F, A] = new EffectProjection(self)
 
-  def run(state: S, seqNr: SeqNr)(implicit M: Monad[M]): M[Result[S, E, F, A]] = {
+  def run(
+    state: S,
+    seqNr: SeqNr,
+  )(implicit
+    M: Monad[M],
+  ): M[Result[S, E, F, A]] = {
     val in = In(state, seqNr, List.empty[E])
     self
       .io(in)
@@ -91,8 +108,11 @@ object Patch extends PatchInstances2 {
   private[Patch] class PartiallyApplied[S](val b: Boolean = false) extends AnyVal {
 
     def apply[M[_], E, F, A](
-      f: (S, SeqNr) => M[(Option[(S, E)], F, A)]
-    )(implicit maker: Maker[M, S, E], M: Functor[M]): Patch[M, S, E, F, A] = {
+      f: (S, SeqNr) => M[(Option[(S, E)], F, A)],
+    )(implicit
+      maker: Maker[M, S, E],
+      M: Functor[M],
+    ): Patch[M, S, E, F, A] = {
       maker.apply(f)
     }
   }
@@ -102,39 +122,73 @@ object Patch extends PatchInstances2 {
   private[Patch] class ChangePartiallyApplied[S](val b: Boolean = false) extends AnyVal {
 
     def apply[M[_], E, F, A](
-      f: (S, SeqNr) => M[(S, E, F, A)]
-    )(implicit maker: Maker[M, S, E], M: Functor[M]): Patch[M, S, E, F, A] = {
+      f: (S, SeqNr) => M[(S, E, F, A)],
+    )(implicit
+      maker: Maker[M, S, E],
+      M: Functor[M],
+    ): Patch[M, S, E, F, A] = {
       maker.change(f)
     }
   }
 
-  def state[M[_], S, E](implicit maker: Maker[M, S, E], M: Applicative[M]): Patch[M, S, E, Unit, S] = {
+  def state[M[_], S, E](
+    implicit
+    maker: Maker[M, S, E],
+    M: Applicative[M],
+  ): Patch[M, S, E, Unit, S] = {
     maker.state
   }
 
-  def seqNr[M[_], S, E](implicit maker: Maker[M, S, E], M: Applicative[M]): Patch[M, S, E, Unit, SeqNr] = {
+  def seqNr[M[_], S, E](
+    implicit
+    maker: Maker[M, S, E],
+    M: Applicative[M],
+  ): Patch[M, S, E, Unit, SeqNr] = {
     maker.seqNr
   }
 
-  def events[M[_], S, E](implicit maker: Maker[M, S, E], M: Applicative[M]): Patch[M, S, E, Unit, List[E]] = {
+  def events[M[_], S, E](
+    implicit
+    maker: Maker[M, S, E],
+    M: Applicative[M],
+  ): Patch[M, S, E, Unit, List[E]] = {
     maker.events
   }
 
-  def pure[M[_], S, E, A](value: A)(implicit maker: Maker[M, S, E], M: Applicative[M]): Patch[M, S, E, Unit, A] = {
+  def pure[M[_], S, E, A](
+    value: A,
+  )(implicit
+    maker: Maker[M, S, E],
+    M: Applicative[M],
+  ): Patch[M, S, E, Unit, A] = {
     maker.pure(value)
   }
 
-  def lift[M[_], S, E, A](value: M[A])(implicit maker: Maker[M, S, E], M: Functor[M]): Patch[M, S, E, Unit, A] = {
+  def lift[M[_], S, E, A](
+    value: M[A],
+  )(implicit
+    maker: Maker[M, S, E],
+    M: Functor[M],
+  ): Patch[M, S, E, Unit, A] = {
     maker.lift(value)
   }
 
   def event[M[_], S, E](
-    event: E
-  )(implicit maker: Maker[M, S, E], M: Functor[M], change: Change[M, S, E]): Patch[M, S, E, Unit, Unit] = {
+    event: E,
+  )(implicit
+    maker: Maker[M, S, E],
+    M: Functor[M],
+    change: Change[M, S, E],
+  ): Patch[M, S, E, Unit, Unit] = {
     maker.event(event)
   }
 
-  def effect[M[_], S, E, F](effect: F)(implicit maker: Maker[M, S, E], M: Applicative[M]): Patch[M, S, E, F, Unit] = {
+  def effect[M[_], S, E, F](
+    effect: F,
+  )(implicit
+    maker: Maker[M, S, E],
+    M: Applicative[M],
+  ): Patch[M, S, E, F, Unit] = {
     maker.effect(effect)
   }
 
@@ -147,7 +201,13 @@ object Patch extends PatchInstances2 {
     }
   }
 
-  final case class Result[S, E, F, A](state: S, seqNr: SeqNr, events: List[E], effect: F, value: A)
+  final case class Result[S, E, F, A](
+    state: S,
+    seqNr: SeqNr,
+    events: List[E],
+    effect: F,
+    value: A,
+  )
 
   trait Change[F[_], S, E] {
     def apply(state: S, seqNr: SeqNr, event: E): F[S]
@@ -171,7 +231,11 @@ object Patch extends PatchInstances2 {
 
   implicit class PatchOps[M[_], S, E, F, A](val self: Patch[M, S, E, F, A]) extends AnyVal {
 
-    def optional[Er](implicit M: MonadError[M, Er], monoid: Monoid[F]): Patch[M, S, E, F, Option[A]] = {
+    def optional[Er](
+      implicit
+      M: MonadError[M, Er],
+      monoid: Monoid[F],
+    ): Patch[M, S, E, F, Option[A]] = {
       of { in =>
         self
           .io(in)
@@ -181,16 +245,25 @@ object Patch extends PatchInstances2 {
     }
   }
 
-  implicit class PatchPatchOps[M[_], S, E, F, F1, A](val self: Patch[M, S, E, F, Patch[M, S, E, F1, A]]) extends AnyVal {
+  implicit class PatchPatchOps[M[_], S, E, F, F1, A](val self: Patch[M, S, E, F, Patch[M, S, E, F1, A]])
+  extends AnyVal {
 
-    def flatten1[F2](implicit M: FlatMap[M], derive: Derive[F, F1, F2]): Patch[M, S, E, F2, A] = {
+    def flatten1[F2](
+      implicit
+      M: FlatMap[M],
+      derive: Derive[F, F1, F2],
+    ): Patch[M, S, E, F2, A] = {
       self.flatMap(identity)
     }
   }
 
   private[patch] class EffectProjection[M[_], S, E, F, A](val self: Patch[M, S, E, F, A]) extends AnyVal {
 
-    def map[F1](f: F => F1)(implicit M: Functor[M]): Patch[M, S, E, F1, A] = {
+    def map[F1](
+      f: F => F1,
+    )(implicit
+      M: Functor[M],
+    ): Patch[M, S, E, F1, A] = {
       of {
         AndThen
           .apply(self.io)
@@ -202,7 +275,12 @@ object Patch extends PatchInstances2 {
       }
     }
 
-    def add[F1, F2](effect: F1)(implicit M: Monad[M], derive: Derive[F, F1, F2]): Patch[M, S, E, F2, A] = {
+    def add[F1, F2](
+      effect: F1,
+    )(implicit
+      M: Monad[M],
+      derive: Derive[F, F1, F2],
+    ): Patch[M, S, E, F2, A] = {
       of {
         AndThen
           .apply(self.io)
@@ -228,7 +306,12 @@ object Patch extends PatchInstances2 {
 
   private[patch] class StateProjection[M[_], S, E, F, A](val self: Patch[M, S, E, F, A]) extends AnyVal {
 
-    def map[S1](toS: S => S1, toS1: S1 => S)(implicit M: Functor[M]): Patch[M, S1, E, F, A] = {
+    def map[S1](
+      toS: S => S1,
+      toS1: S1 => S,
+    )(implicit
+      M: Functor[M],
+    ): Patch[M, S1, E, F, A] = {
       of { in =>
         self
           .io
@@ -241,11 +324,17 @@ object Patch extends PatchInstances2 {
       }
     }
 
-    def flatMap[S1](toS: S => M[S1])(toS1: S1 => M[S])(implicit M: FlatMap[M]): Patch[M, S1, E, F, A] = {
+    def flatMap[S1](
+      toS: S => M[S1],
+    )(
+      toS1: S1 => M[S],
+    )(implicit
+      M: FlatMap[M],
+    ): Patch[M, S1, E, F, A] = {
       of { in =>
         for {
           state <- toS1(in.state)
-          out   <- self.io { in.copy(state = state) }
+          out <- self.io { in.copy(state = state) }
           state <- toS(out.state)
         } yield {
           out.copy(state = state)
@@ -256,7 +345,12 @@ object Patch extends PatchInstances2 {
 
   private[patch] class EventProjection[M[_], S, E, F, A](val self: Patch[M, S, E, F, A]) extends AnyVal {
 
-    def map[E1](toE1: E => E1, toE: E1 => E)(implicit M: Functor[M]): Patch[M, S, E1, F, A] = {
+    def map[E1](
+      toE1: E => E1,
+      toE: E1 => E,
+    )(implicit
+      M: Functor[M],
+    ): Patch[M, S, E1, F, A] = {
       of { in =>
         self
           .io
@@ -264,14 +358,14 @@ object Patch extends PatchInstances2 {
             in.copy(
               events = in
                 .events
-                .map(toE)
+                .map(toE),
             )
           }
           .map { out =>
             out.copy(
               events = out
                 .events
-                .map(toE1)
+                .map(toE1),
             )
           }
       }
@@ -282,7 +376,13 @@ object Patch extends PatchInstances2 {
     def out[F, A](effect: F, a: A): Out[S, E, F, A] = Out(state, seqNr, events, effect, a)
   }
 
-  private[patch] final case class Out[S, E, F, A](state: S, seqNr: SeqNr, events: List[E], effect: F, a: A) {
+  private[patch] final case class Out[S, E, F, A](
+    state: S,
+    seqNr: SeqNr,
+    events: List[E],
+    effect: F,
+    a: A,
+  ) {
     def in: In[S, E] = In(state, seqNr, events)
   }
 
@@ -291,7 +391,8 @@ object Patch extends PatchInstances2 {
     implicit class EitherOpsPatch[F[_], L, R](val self: Either[L, R]) extends AnyVal {
 
       def patchEitherTLift[S, E](
-        implicit maker: Maker[EitherT[F, L, *], S, E],
+        implicit
+        maker: Maker[EitherT[F, L, *], S, E],
         F: Monad[F],
       ): Patch[EitherT[F, L, *], S, E, Unit, R] = {
         self
@@ -301,12 +402,17 @@ object Patch extends PatchInstances2 {
     }
 
     implicit class OpsPatch[M[_], A](val self: M[A]) extends AnyVal {
-      def patchLift[S, E](implicit maker: Maker[M, S, E], M: Functor[M]): Patch[M, S, E, Unit, A] = maker.lift(self)
+      def patchLift[S, E](
+        implicit
+        maker: Maker[M, S, E],
+        M: Functor[M],
+      ): Patch[M, S, E, Unit, A] = maker.lift(self)
 
       // TODO TECH-756 how could we get rid of this?
       def patchEitherTLift[Er, S, E](
-        implicit maker: Maker[EitherT[M, Er, *], S, E],
-        M: Monad[M]
+        implicit
+        maker: Maker[EitherT[M, Er, *], S, E],
+        M: Monad[M],
       ): Patch[EitherT[M, Er, *], S, E, Unit, A] = {
         maker.lift { EitherT.right[Er] { self } }
       }
@@ -314,38 +420,81 @@ object Patch extends PatchInstances2 {
 
     implicit class IdOpsPatch[A](val self: A) extends AnyVal {
       def patchEvent[M[_], S](
-        implicit maker: Maker[M, S, A],
+        implicit
+        maker: Maker[M, S, A],
         change: Change[M, S, A],
-        M: Functor[M]
+        M: Functor[M],
       ): Patch[M, S, A, Unit, Unit] = maker.event(self)
 
-      def patch[M[_], S, E](implicit maker: Maker[M, S, E], M: Applicative[M]): Patch[M, S, E, Unit, A] =
+      def patch[M[_], S, E](
+        implicit
+        maker: Maker[M, S, E],
+        M: Applicative[M],
+      ): Patch[M, S, E, Unit, A] =
         maker.pure(self)
 
-      def patchEffect[F[_], S, E](implicit maker: Maker[F, S, E], F: Applicative[F]): Patch[F, S, E, A, Unit] =
+      def patchEffect[F[_], S, E](
+        implicit
+        maker: Maker[F, S, E],
+        F: Applicative[F],
+      ): Patch[F, S, E, A, Unit] =
         maker.effect(self)
     }
   }
 
   trait Maker[M[_], S, E] {
 
-    def apply[F, A](f: (S, SeqNr) => M[(Option[(S, E)], F, A)])(implicit M: Functor[M]): Patch[M, S, E, F, A]
+    def apply[F, A](
+      f: (S, SeqNr) => M[(Option[(S, E)], F, A)],
+    )(implicit
+      M: Functor[M],
+    ): Patch[M, S, E, F, A]
 
-    def change[F, A](f: (S, SeqNr) => M[(S, E, F, A)])(implicit M: Functor[M]): Patch[M, S, E, F, A]
+    def change[F, A](
+      f: (S, SeqNr) => M[(S, E, F, A)],
+    )(implicit
+      M: Functor[M],
+    ): Patch[M, S, E, F, A]
 
-    def state(implicit M: Applicative[M]): Patch[M, S, E, Unit, S]
+    def state(
+      implicit
+      M: Applicative[M],
+    ): Patch[M, S, E, Unit, S]
 
-    def seqNr(implicit M: Applicative[M]): Patch[M, S, E, Unit, SeqNr]
+    def seqNr(
+      implicit
+      M: Applicative[M],
+    ): Patch[M, S, E, Unit, SeqNr]
 
-    def events(implicit M: Applicative[M]): Patch[M, S, E, Unit, List[E]]
+    def events(
+      implicit
+      M: Applicative[M],
+    ): Patch[M, S, E, Unit, List[E]]
 
-    def pure[A](value: A)(implicit M: Applicative[M]): Patch[M, S, E, Unit, A]
+    def pure[A](
+      value: A,
+    )(implicit
+      M: Applicative[M],
+    ): Patch[M, S, E, Unit, A]
 
-    def lift[A](value: M[A])(implicit M: Functor[M]): Patch[M, S, E, Unit, A]
+    def lift[A](
+      value: M[A],
+    )(implicit
+      M: Functor[M],
+    ): Patch[M, S, E, Unit, A]
 
-    def event(event: E)(implicit M: Functor[M], change: Change[M, S, E]): Patch[M, S, E, Unit, Unit]
+    def event(
+      event: E,
+    )(implicit
+      M: Functor[M],
+      change: Change[M, S, E],
+    ): Patch[M, S, E, Unit, Unit]
 
-    def effect[F](effect: F)(implicit M: Applicative[M]): Patch[M, S, E, F, Unit]
+    def effect[F](
+      effect: F,
+    )(implicit
+      M: Applicative[M],
+    ): Patch[M, S, E, F, Unit]
   }
 
   object Maker {
@@ -353,16 +502,24 @@ object Patch extends PatchInstances2 {
     def apply[M[_], S, E]: Maker[M, S, E] = {
       new Maker[M, S, E] {
 
-        def apply[F, A](f: (S, SeqNr) => M[(Option[(S, E)], F, A)])(implicit M: Functor[M]) = {
+        def apply[F, A](
+          f: (S, SeqNr) => M[(Option[(S, E)], F, A)],
+        )(implicit
+          M: Functor[M],
+        ) = {
           of { in =>
             f(in.state, in.seqNr).map {
               case (Some((s, e)), f, a) => Out(s, in.seqNr.inc, e :: in.events, f, a)
-              case (None, f, a)         => in.out(f, a)
+              case (None, f, a) => in.out(f, a)
             }
           }
         }
 
-        def change[F, A](f: (S, SeqNr) => M[(S, E, F, A)])(implicit functor: Functor[M]) = {
+        def change[F, A](
+          f: (S, SeqNr) => M[(S, E, F, A)],
+        )(implicit
+          functor: Functor[M],
+        ) = {
           of { in =>
             f(in.state, in.seqNr).map {
               case (s, e, f, a) => Out(s, in.seqNr.inc, e :: in.events, f, a)
@@ -370,7 +527,10 @@ object Patch extends PatchInstances2 {
           }
         }
 
-        def state(implicit M: Applicative[M]) = {
+        def state(
+          implicit
+          M: Applicative[M],
+        ) = {
           of { in =>
             in
               .out((), in.state)
@@ -378,7 +538,10 @@ object Patch extends PatchInstances2 {
           }
         }
 
-        def seqNr(implicit M: Applicative[M]) = {
+        def seqNr(
+          implicit
+          M: Applicative[M],
+        ) = {
           of { in =>
             in
               .out((), in.seqNr)
@@ -386,7 +549,10 @@ object Patch extends PatchInstances2 {
           }
         }
 
-        def events(implicit M: Applicative[M]) = {
+        def events(
+          implicit
+          M: Applicative[M],
+        ) = {
           of { in =>
             in
               .out((), in.events.reverse)
@@ -394,7 +560,11 @@ object Patch extends PatchInstances2 {
           }
         }
 
-        def pure[A](value: A)(implicit M: Applicative[M]) = {
+        def pure[A](
+          value: A,
+        )(implicit
+          M: Applicative[M],
+        ) = {
           of { in =>
             in
               .out((), value)
@@ -402,7 +572,11 @@ object Patch extends PatchInstances2 {
           }
         }
 
-        def lift[A](value: M[A])(implicit M: Functor[M]) = {
+        def lift[A](
+          value: M[A],
+        )(implicit
+          M: Functor[M],
+        ) = {
           of { in =>
             value.map { a =>
               in.out((), a)
@@ -410,7 +584,12 @@ object Patch extends PatchInstances2 {
           }
         }
 
-        def event(event: E)(implicit M: Functor[M], change: Change[M, S, E]) = {
+        def event(
+          event: E,
+        )(implicit
+          M: Functor[M],
+          change: Change[M, S, E],
+        ) = {
           of { in =>
             change(in.state, in.seqNr, event).map { state =>
               Out(state, in.seqNr.inc, event :: in.events, (), ())
@@ -418,7 +597,11 @@ object Patch extends PatchInstances2 {
           }
         }
 
-        def effect[F](effect: F)(implicit M: Applicative[M]) = {
+        def effect[F](
+          effect: F,
+        )(implicit
+          M: Applicative[M],
+        ) = {
           of { in =>
             in
               .out(effect, ())
@@ -434,11 +617,11 @@ object Patch extends PatchInstances2 {
   }
 }
 
-sealed abstract private[patch] class PatchInstances1 {
+private[patch] sealed abstract class PatchInstances1 {
   import Patch._
 
   implicit def monadPatch[M[_]: Monad, S, E, F: Monoid]: Monad[Patch[M, S, E, F, *]] = {
-    implicit val derive = Derive.fromMonoid[F]
+    implicit val derive: Derive[F, F, F] = Derive.fromMonoid[F]
     new Monad[Patch[M, S, E, F, *]] {
 
       def pure[A](a: A) = {
@@ -481,10 +664,11 @@ sealed abstract private[patch] class PatchInstances1 {
   }
 }
 
-sealed abstract private[patch] class PatchInstances2 extends PatchInstances1 {
+private[patch] sealed abstract class PatchInstances2 extends PatchInstances1 {
   import Patch._
 
-  implicit def monoidPatch[M[_], S, E, F, A](implicit
+  implicit def monoidPatch[M[_], S, E, F, A](
+    implicit
     maker: Maker[M, S, E],
     M: Monad[M],
     F: Monoid[F],
@@ -511,9 +695,10 @@ sealed abstract private[patch] class PatchInstances2 extends PatchInstances1 {
   }
 
   implicit def monadErrorPatch[M[_], Er, S, E, F: Monoid](
-    implicit M: MonadError[M, Er]
+    implicit
+    M: MonadError[M, Er],
   ): MonadError[Patch[M, S, E, F, *], Er] = {
-    implicit val derive = Derive.fromMonoid[F]
+    implicit val derive: Derive[F, F, F] = Derive.fromMonoid[F]
     new MonadError[Patch[M, S, E, F, *], Er] with StackSafeMonad[Patch[M, S, E, F, *]] {
 
       def pure[A](a: A) = {

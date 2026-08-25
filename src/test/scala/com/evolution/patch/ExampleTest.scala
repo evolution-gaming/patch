@@ -19,9 +19,8 @@ class ExampleTest extends AnyFunSuite with Matchers {
 
     // how to apply newly issued event to state
     implicit val change = Patch.Change[State, Event] { (state, seqNr, event) =>
-      state
-        .copy(value = state.value + event.value)
-        .pure[IO]
+      IO.pure(state
+        .copy(value = state.value + event.value))
     }
 
     import com.evolution.patch.Patch.implicits._ // adds nice syntax
@@ -32,13 +31,13 @@ class ExampleTest extends AnyFunSuite with Matchers {
 
     val patch: Patch[IO, State, Event, IO[Unit], Either[String, State]] = for {
       enabled <- enabled.patchLift // you might need to execute effect in order to decide on how to proceed
-      result  <- if (enabled) {
+      result <- if (enabled) {
         for {
           before <- Patch.state
-          _      <- Event(+1).patchEvent // event to be appended
-          after  <- Patch.state // state after event is applied
-          seqNr  <- Patch.seqNr // seqNr at this point
-          _      <- log(s"state changed from $before to $after($seqNr)").patchEffect
+          _ <- Event(+1).patchEvent // event to be appended
+          after <- Patch.state // state after event is applied
+          seqNr <- Patch.seqNr // seqNr at this point
+          _ <- log(s"state changed from $before to $after($seqNr)").patchEffect
         } yield {
           after.asRight[String]
         }
