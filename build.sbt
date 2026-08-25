@@ -1,4 +1,4 @@
-import Dependencies._
+import Dependencies.*
 
 name := "patch"
 
@@ -14,29 +14,60 @@ organizationHomepage := Some(url("https://evolution.com"))
 
 scalaVersion := crossScalaVersions.value.head
 
-crossScalaVersions := Seq("2.13.12", "2.12.18")
+crossScalaVersions := Seq("2.13.18", "3.3.8")
 
 publishTo := Some(Resolver.evolutionReleases)
 
-libraryDependencies += compilerPlugin(`kind-projector` cross CrossVersion.full)
+libraryDependencies ++= {
+  scalaBinaryVersion.value match {
+    case "2.13" => Seq(compilerPlugin(`kind-projector`.cross(CrossVersion.full)))
+    case _ => Nil
+  }
+}
 
 scalacOptsFailOnWarn := Some(false)
 
+scalacOptions ++= {
+  scalaBinaryVersion.value match {
+    case "2.13" =>
+      Seq(
+        "-Xsource:3",
+      )
+    case _ =>
+      Seq(
+        "-Ykind-projector:underscores",
+
+        // disable new brace-less syntax:
+        // https://alexn.org/blog/2022/10/24/scala-3-optional-braces/
+        "-no-indent",
+
+        // improve error messages:
+        "-explain",
+        "-explain-types",
+      )
+  }
+}
+
 libraryDependencies ++= Seq(
   Cats.core,
-  Cats.laws              % Test,
-  `cats-effect`          % Test,
-  scalatest              % Test,
-  `scalacheck-shapeless` % Test,
+  Cats.laws % Test,
+  `cats-effect` % Test,
+  scalatest % Test,
   `discipline-scalatest` % Test,
 )
 
 licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
 
-releaseCrossBuild := true
-
 versionScheme := Some("early-semver")
 
-//addCommandAlias("check", "all versionPolicyCheck Compile/doc")
-addCommandAlias("check", "show version")
+versionPolicyIntention := {
+  // TODO temporary disable bin-compat check for first Scala 3 build
+  scalaBinaryVersion.value match {
+    case "2.13" => Compatibility.BinaryCompatible
+    case _ => Compatibility.None
+  }
+}
+
+addCommandAlias("check", "+all scalafmtCheckRepo versionPolicyCheck Compile/doc")
+addCommandAlias("fmt", "scalafmtRepo")
 addCommandAlias("build", "+all compile test")

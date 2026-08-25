@@ -15,8 +15,10 @@ import scala.util.Try
 class PatchTest extends AnyFunSuite with Matchers {
 
   test("all") {
-    implicit val P      = Patch.Maker[Id, Int, String]
-    implicit val change = Patch.Change[Int, String] { (state, _, _) => (state + 1).pure[Id] }
+    implicit val P = Patch.Maker[Id, Int, String]
+    implicit val change: Patch.Change[Id, Int, String] = Patch.Change[Int, String] { (state, _, _) =>
+      (state + 1).pure[Id]
+    }
     val patch = for {
       _ <- ().patch[Id, Int, String]
       a <- P.lift { "a".pure[Id] }
@@ -27,15 +29,18 @@ class PatchTest extends AnyFunSuite with Matchers {
       _ <- P.change { (s, _) => (s + 1, "e1", (), ()).pure[Id] }
     } yield a
     patch
-      .run(0, SeqNr.Min) shouldEqual Patch
-      .Result
-      .apply(2, 2L, List("e0", "e1"), "f", "a")
-      .pure[Id]
+      .run(0, SeqNr.Min) shouldEqual
+      Patch
+        .Result
+        .apply(2, 2L, List("e0", "e1"), "f", "a")
+        .pure[Id]
   }
 
   test("all complex") {
-    implicit val P      = Patch.Maker[Id, SeqNr, String]
-    implicit val change = Patch.Change[SeqNr, String] { (s, _, _) => (s + 1).pure[Id] }
+    implicit val P = Patch.Maker[Id, SeqNr, String]
+    implicit val change: Patch.Change[Id, SeqNr, String] = Patch.Change[SeqNr, String] { (s, _, _) =>
+      (s + 1).pure[Id]
+    }
 
     def lift[A](a: A) = {
       for {
@@ -78,16 +83,17 @@ class PatchTest extends AnyFunSuite with Matchers {
     }
 
     patch1
-      .run(0L, SeqNr.Min) shouldEqual Patch
-      .Result
-      .apply(
-        state  = 8L,
-        seqNr  = 8L,
-        events = List("0", "1", "x2", "3", "4", "x5", "6", "7"),
-        effect = ("1", ("4", "7")),
-        value  = ((0L, 1L, "1"), (3L, 4L, "4"), (6L, 7L, "7"))
-      )
-      .pure[Id]
+      .run(0L, SeqNr.Min) shouldEqual
+      Patch
+        .Result
+        .apply(
+          state = 8L,
+          seqNr = 8L,
+          events = List("0", "1", "x2", "3", "4", "x5", "6", "7"),
+          effect = ("1", ("4", "7")),
+          value = ((0L, 1L, "1"), (3L, 4L, "4"), (6L, 7L, "7")),
+        )
+        .pure[Id]
   }
 
   test("map/flatMap") {
@@ -122,14 +128,14 @@ class PatchTest extends AnyFunSuite with Matchers {
         }
         patch.run(0, 1L)
       }
-      _  = result.value shouldEqual List(1L, 2L, 3L, 4L, 4L)
-      _  = result.state shouldEqual 2
-      _  = result.events shouldEqual List("inc", "dec", "inc", "inc")
+      _ = result.value shouldEqual List(1L, 2L, 3L, 4L, 4L)
+      _ = result.state shouldEqual 2
+      _ = result.events shouldEqual List("inc", "dec", "inc", "inc")
       a <- logs.get
-      _  = a shouldEqual List.empty
+      _ = a shouldEqual List.empty
       _ <- result.effect
       a <- logs.get
-      _  = a.reverse shouldEqual List("+1", "-1", "+1", "empty", "+1")
+      _ = a.reverse shouldEqual List("+1", "-1", "+1", "empty", "+1")
     } yield {}
 
     result.unsafeRunSync()
@@ -139,10 +145,11 @@ class PatchTest extends AnyFunSuite with Matchers {
     implicit val P = Patch.Maker[Id, Unit, Unit]
     ()
       .patch
-      .run((), SeqNr.Min) shouldEqual Patch
-      .Result
-      .apply((), SeqNr.Min, List.empty, (), ())
-      .pure[Id]
+      .run((), SeqNr.Min) shouldEqual
+      Patch
+        .Result
+        .apply((), SeqNr.Min, List.empty, (), ())
+        .pure[Id]
   }
 
   test("lift") {
@@ -150,10 +157,11 @@ class PatchTest extends AnyFunSuite with Matchers {
     "a"
       .pure[Id]
       .patchLift
-      .run((), SeqNr.Min) shouldEqual Patch
-      .Result
-      .apply((), SeqNr.Min, List.empty, (), "a")
-      .pure[Id]
+      .run((), SeqNr.Min) shouldEqual
+      Patch
+        .Result
+        .apply((), SeqNr.Min, List.empty, (), "a")
+        .pure[Id]
   }
 
   test("map") {
@@ -161,15 +169,16 @@ class PatchTest extends AnyFunSuite with Matchers {
     ()
       .patch
       .map { _.toString }
-      .run((), SeqNr.Min) shouldEqual Patch
-      .Result
-      .apply((), SeqNr.Min, List.empty, (), "()")
-      .pure[Id]
+      .run((), SeqNr.Min) shouldEqual
+      Patch
+        .Result
+        .apply((), SeqNr.Min, List.empty, (), "()")
+        .pure[Id]
   }
 
   test("seqNr") {
-    implicit val P      = Patch.Maker[Id, Unit, Unit]
-    implicit val change = Patch.Change.const[Unit](().pure[Id])
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    implicit val change: Patch.Change[Id, Unit, Unit] = Patch.Change.const[Unit](().pure[Id])
     val patch = for {
       a <- P.seqNr
       _ <- ().patchEvent
@@ -193,8 +202,10 @@ class PatchTest extends AnyFunSuite with Matchers {
   }
 
   test("event") {
-    implicit val P      = Patch.Maker[Id, Int, Int]
-    implicit val change = Patch.Change[Int, Int] { (state, _, event) => (state + event).pure[Id] }
+    implicit val P = Patch.Maker[Id, Int, Int]
+    implicit val change: Patch.Change[Id, Int, Int] = Patch.Change[Int, Int] { (state, _, event) =>
+      (state + event).pure[Id]
+    }
     val patch = for {
       a <- P.state
       _ <- 1.patchEvent
@@ -278,9 +289,9 @@ class PatchTest extends AnyFunSuite with Matchers {
   }
 
   test("effect with custom derivation") {
-    implicit val P                  = Patch.Maker[Id, Unit, Unit]
-    val `+` : Derive[Int, Int, Int] = _ + _
-    val `-` : Derive[Int, Int, Int] = _ - _
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    val `+`: Derive[Int, Int, Int] = _ + _
+    val `-`: Derive[Int, Int, Int] = _ - _
     val patch = 0
       .patchEffect
       .flatMap { _ =>
@@ -332,7 +343,7 @@ class PatchTest extends AnyFunSuite with Matchers {
 
   test("orElse") {
     implicit val P = Patch.Maker[Either[Unit, *], Int, Int]
-    implicit val change = Patch.Change[Int, Int] { (s, _, e) =>
+    implicit val change: Patch.Change[Either[Unit, *], Int, Int] = Patch.Change[Int, Int] { (s, _, e) =>
       val s1 = s + e
       if (s1 >= 0) s1.asRight[Unit]
       else ().asLeft[Int]
@@ -368,15 +379,16 @@ class PatchTest extends AnyFunSuite with Matchers {
     } yield {}
 
     patch
-      .run(List.empty, SeqNr.Min) shouldEqual Patch
-      .Result
-      .apply(
-        state  = List(("c", 2), ("b", 1), ("a", 0)),
-        seqNr  = 3L,
-        events = List(0, 1, 2),
-        effect = ((0, 1), 2),
-        value  = ()
-      )
+      .run(List.empty, SeqNr.Min) shouldEqual
+      Patch
+        .Result
+        .apply(
+          state = List(("c", 2), ("b", 1), ("a", 0)),
+          seqNr = 3L,
+          events = List(0, 1, 2),
+          effect = ((0, 1), 2),
+          value = (),
+        )
   }
 
   test("apply") {
@@ -387,8 +399,8 @@ class PatchTest extends AnyFunSuite with Matchers {
   }
 
   test("flatMap stacksafe") {
-    implicit val P      = Patch.Maker[Id, Unit, Unit]
-    implicit val change = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[Id] }
+    implicit val P = Patch.Maker[Id, Unit, Unit]
+    implicit val change: Patch.Change[Id, Unit, Unit] = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[Id] }
     val patch = for {
       _ <- P.state
       _ <- P.event(())
@@ -409,8 +421,8 @@ class PatchTest extends AnyFunSuite with Matchers {
   }
 
   test("tailRecM stacksafe") {
-    implicit val P      = Patch.Maker[IO, Unit, Unit]
-    implicit val change = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[IO] }
+    implicit val P = Patch.Maker[IO, Unit, Unit]
+    implicit val change: Patch.Change[IO, Unit, Unit] = Patch.Change[Unit, Unit] { (_, _, _) => ().pure[IO] }
     val patch = for {
       _ <- P.state
       _ <- P.event(())
@@ -458,9 +470,10 @@ class PatchTest extends AnyFunSuite with Matchers {
     }
 
     patch
-      .run((), SeqNr.Min) shouldEqual Patch.Result
-      .apply((), SeqNr.Min, List.empty, (), ("ok".some, none))
-      .asRight
+      .run((), SeqNr.Min) shouldEqual
+      Patch.Result
+        .apply((), SeqNr.Min, List.empty, (), ("ok".some, none))
+        .asRight
   }
 
   test("attempt") {
@@ -479,8 +492,9 @@ class PatchTest extends AnyFunSuite with Matchers {
     }
 
     patch
-      .run((), SeqNr.Min) shouldEqual Patch.Result
-      .apply((), SeqNr.Min, List.empty, (), ("ok".asRight, "ko".asLeft))
-      .asRight
+      .run((), SeqNr.Min) shouldEqual
+      Patch.Result
+        .apply((), SeqNr.Min, List.empty, (), ("ok".asRight, "ko".asLeft))
+        .asRight
   }
 }
