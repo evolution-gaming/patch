@@ -60,13 +60,7 @@ licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
 
 versionScheme := Some("early-semver")
 
-versionPolicyIntention := {
-  // TODO temporary disable bin-compat check for first Scala 3 build
-  scalaBinaryVersion.value match {
-    case "2.13" => Compatibility.BinaryCompatible
-    case _ => Compatibility.None
-  }
-}
+versionPolicyIntention := Compatibility.BinaryCompatible
 
 addCommandAlias("check", "+all scalafmtCheckRepo versionPolicyCheck Compile/doc")
 addCommandAlias("fmt", "scalafmtRepo")
