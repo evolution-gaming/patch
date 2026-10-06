@@ -5,7 +5,7 @@ object Dependencies {
   val scalatest = "org.scalatest" %% "scalatest" % "3.2.20"
 
   val `kind-projector` = "org.typelevel" % "kind-projector" % "0.13.4"
-  val `discipline-scalatest` = "org.typelevel" %% "discipline-scalatest" % "2.2.0"
+  val `discipline-scalatest` = "org.typelevel" %% "discipline-scalatest" % "2.3.0"
   val `cats-effect` = "org.typelevel" %% "cats-effect" % "3.7.1"
 
   object Cats {
