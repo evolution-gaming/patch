@@ -4,17 +4,17 @@ name := "patch"
 
 organization := "com.evolution"
 
-homepage := Some(url("https://github.com/evolution-gaming/patch"))
+homepage := Some(uri("https://github.com/evolution-gaming/patch"))
 
 startYear := Some(2020)
 
 organizationName := "Evolution"
 
-organizationHomepage := Some(url("https://evolution.com"))
+organizationHomepage := Some(uri("https://evolution.com"))
 
 scalaVersion := crossScalaVersions.value.head
 
-crossScalaVersions := Seq("2.13.18", "3.3.8")
+crossScalaVersions := Seq("2.13.18", "3.3.9")
 
 publishTo := Some(Resolver.evolutionReleases)
 
@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
   `discipline-scalatest` % Test,
 )
 
-licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
+licenses := Seq(("MIT", uri("https://opensource.org/licenses/MIT")))
 
 versionScheme := Some("early-semver")
 
@@ -64,4 +64,4 @@ versionPolicyIntention := Compatibility.BinaryCompatible
 
 addCommandAlias("check", "+all scalafmtCheckRepo versionPolicyCheck Compile/doc")
 addCommandAlias("fmt", "scalafmtRepo")
-addCommandAlias("build", "+all compile test")
+addCommandAlias("build", "+all compile testFull")
